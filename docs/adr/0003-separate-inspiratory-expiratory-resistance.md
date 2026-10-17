@@ -1,0 +1,3 @@
+# Separate inspiratory and expiratory resistance
+
+`simulation-engine.md` defines one R_aw. The lung model instead has **R_insp** and **R_exp**. With a single linear resistance, the obstructive profiles can't reach the spec's own PEEP_i range (8–18 cmH2O) at realistic settings. A steady-state check gave about 2.4 cmH2O for asthma. Real obstruction is worse during expiration (dynamic airway collapse). Making R_exp about 2.2× R_insp reproduces both the peak–plateau gap and the auto-PEEP while keeping the model linear and one-compartment. The spec's tau ranges are understood as using R_insp. Curved, flow-limited resistance was considered and deferred because it adds complexity.

@@ -1,0 +1,17 @@
+{
+  "name": "mech-vent-sim",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "corepack pnpm --filter web dev",
+    "build": "corepack pnpm -r build",
+    "test": "corepack pnpm -r test",
+    "lint": "corepack pnpm -r lint",
+    "typecheck": "corepack pnpm -r typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3"
+  }
+}
