@@ -1,0 +1,140 @@
+/**
+ * Core Engine types. All internal quantities use the Engine's unit system:
+ * volume L · flow L/s (+ = inspiratory) · pressure cmH2O · time s · compliance L/cmH2O ·
+ * resistance cmH2O/(L/s). The UI converts to display units (mL, L/min).
+ */
+
+/** Passive respiratory-system mechanics of a Patient Profile. */
+export interface Mechanics {
+  /** Respiratory-system compliance C_rs (L/cmH2O). */
+  compliance: number;
+  /** Inspiratory Resistance R_insp (cmH2O/(L/s)). */
+  rInsp: number;
+  /** Expiratory Resistance R_exp (cmH2O/(L/s)). */
+  rExp: number;
+}
+
+/** Respiratory drive: produces Muscle Pressure on its own neural clock. */
+export interface Drive {
+  /** Neural breathing rate (breaths/min). 0 = no effort (central apnea). */
+  neuralRate: number;
+  /** Peak Muscle Pressure per effort (cmH2O, ≥ 0). */
+  pmusMax: number;
+  /** Fraction of the neural cycle spent in active inspiration (0–1). */
+  inspFraction: number;
+}
+
+export interface Patient {
+  mechanics: Mechanics;
+  drive: Drive;
+}
+
+export type Mode = "VCV" | "PCV" | "PSV";
+
+export type TriggerSetting =
+  | { type: "flow"; /** L/s */ threshold: number }
+  | { type: "pressure"; /** cmH2O below PEEP */ threshold: number };
+
+interface CommonSettings {
+  /** Extrinsic PEEP (cmH2O). */
+  peep: number;
+  /** Inspired O2 fraction (0.21–1). */
+  fio2: number;
+  trigger: TriggerSetting;
+  /** Airway pressure at which inspiration is ended immediately (cmH2O). */
+  highPressureLimit: number;
+}
+
+export interface VcvSettings extends CommonSettings {
+  mode: "VCV";
+  /** Set tidal volume (L). */
+  tidalVolume: number;
+  /** Mandatory rate (breaths/min). */
+  rate: number;
+  /** Peak inspiratory flow (L/s). */
+  peakFlow: number;
+  /** Square = constant flow; decelerating = linear ramp from peak flow to zero. */
+  flowPattern: "square" | "decelerating";
+  /** End-inspiratory pause (s); 0 = none. */
+  pauseTime: number;
+}
+
+export interface PcvSettings extends CommonSettings {
+  mode: "PCV";
+  /** Set pressure above PEEP (cmH2O). */
+  pInsp: number;
+  rate: number;
+  /** Inspiratory time (s). */
+  inspTime: number;
+  /** Time for airway pressure to reach target (s). */
+  riseTime: number;
+}
+
+/** Mandatory pressure-controlled ventilation used by Apnea Backup. */
+export interface BackupSettings {
+  pInsp: number;
+  rate: number;
+  inspTime: number;
+}
+
+export interface PsvSettings extends CommonSettings {
+  mode: "PSV";
+  /** Pressure support above PEEP (cmH2O). */
+  pSupport: number;
+  riseTime: number;
+  /** Expiratory Sensitivity: cycle when flow falls to this fraction of peak flow (0–1). */
+  esens: number;
+  /** Seconds without a breath before Apnea Backup starts. */
+  apneaTime: number;
+  backup: BackupSettings;
+}
+
+export type VentSettings = VcvSettings | PcvSettings | PsvSettings;
+
+export type BreathTrigger = "mandatory" | "patient" | "backup";
+
+/** Raw record of one completed Breath, measured at the Engine's internal rate. */
+export interface BreathRecord {
+  startTime: number;
+  endTime: number;
+  trigger: BreathTrigger;
+  mode: Mode;
+  /** Time from breath start to start of expiration, including any pause (s). */
+  inspTime: number;
+  /** Inspired volume (L). */
+  vti: number;
+  /** Expired volume (L, positive). */
+  vte: number;
+  peakPaw: number;
+  meanPaw: number;
+  /** Airway pressure at the end of the breath's expiration. */
+  endExpPaw: number;
+  /** True alveolar pressure at the end of expiration (Engine truth; the UI measures PEEP_i with an Expiratory Hold). */
+  endExpPalv: number;
+  /** Airway pressure at the end of the inspiratory pause, when a pause occurred. */
+  plateauPaw: number | null;
+  peakInspFlow: number;
+  /** Flow at the moment inspiration ended (L/s). */
+  cycleFlow: number;
+  /** Inspiration was ended by the high pressure limit. */
+  highPressureCycled: boolean;
+}
+
+export type EngineEvent =
+  | { type: "breathStart"; t: number; trigger: BreathTrigger }
+  | { type: "settingsApplied"; t: number }
+  | { type: "apneaBackupStarted"; t: number }
+  | { type: "apneaBackupEnded"; t: number }
+  | { type: "highPressureCycle"; t: number; paw: number };
+
+/** Interleaved Sample layout in the output Float32Array. */
+export const SAMPLE = {
+  T: 0,
+  PAW: 1,
+  FLOW: 2,
+  /** Volume since the start of the current Breath (L), as a ventilator displays it. */
+  VOLUME: 3,
+  PALV: 4,
+  PMUS: 5,
+  STRIDE: 6,
+} as const;
