@@ -74,6 +74,13 @@ Domain language: [GLOSSARY.md](./GLOSSARY.md) · Decisions: [docs/adr/](./docs/a
 
 Units: mL/cmH2O · cmH2O/(L/s) · mL/min · mmol/L · breaths/min / cmH2O. Still to set during M4: HR/BP per profile, recruitment settings, anatomic dead space (0.25 assumed).
 
+### Round 4 ⏳ (raised during M5: waiting on your answers)
+
+- [ ] R4-Q1 Starting drive: sedated, or the profile's own drive
+- [ ] R4-Q2 Chemoreflex: should drive respond to pH/PaCO2
+- [ ] R4-Q3 Obstructive R_exp too low to reach PEEP_i 8–18 at RR 16
+- [ ] R4-Q4 High pressure limit 40 cuts every asthma breath short
+
 ### Defaults I'm assuming (not asked, tell me if any are wrong)
 
 - Tooling: `git init` (branch `main`, no remote yet), pnpm workspaces, Node LTS, TypeScript strict, Vitest, ESLint + Prettier
@@ -97,7 +104,7 @@ Each milestone ends with its tests passing and an update here.
 - [x] **M2 Engine core**: lung model (C, R_insp, R_exp) behind an interface · RK4 at 1 kHz, Samples sent out at 100 Hz · P_mus generator with its own neural clock · VCV (square/decelerating, pause), PCV (rise time), PSV (Esens) · flow/pressure trigger with delay · breath detection _Done 2026-10-17: 17 physics tests passing (exact VCV/PCV formulas, exhalation decay, steady-state PEEP_i matches the formula and falls with lower RR, flow and pressure triggers, ineffective triggering from PEEP_i, PSV cycles at Esens, Apnea Backup, high pressure limit ends inspiration, settings apply at the next breath, deterministic). Runs about 6000× faster than real time. Notes: decelerating VCV ramps to zero flow (Ti = 2·Vt/peak flow); Apnea Backup stays on until reset by hand (`endApneaBackup`)._
 - [x] **M3 Measurements and alarms**: BreathMetrics · Inspiratory Pause and Expiratory Hold · C_stat/R_aw · alarm engine (settable limits, priority levels, silence, high pressure ends inspiration) · Apnea Backup _Done 2026-10-17: 10 new tests (28 total). Added `Session` = Simulator + Monitor + AlarmEngine (the Worker will host it in M6). ⚠ Decision for you to check: the **Auto-PEEP** and **High Driving Pressure** alarms use the Engine's true values every breath (real ventilators can't know these without a maneuver). Displayed P_plat, Total PEEP and PEEP_i only come from maneuvers. Default limits: Vte 0.25–1.0 L, V_E 4–20 L/min, RR > 35, Auto-PEEP > 5, Driving Pressure > 15. Holds last 0.5 s._
 - [x] **M4 Blood gases and vitals**: PaCO2/PaO2 (shunt mixing)/pH/EtCO2 moving toward targets over time · recruitment curve · SpO2 · BP rule · fast-forward _Done 2026-10-17: 10 new tests (38 total). How it works: CO2 is a mass balance (store 13 mL/mmHg, so τ ≈ 2.5 min at normal V_A; apnea raises PaCO2 ≈ 15 mmHg in the first minute). Dead space = fixed 125 mL anatomic + an alveolar fraction, so Vd/Vt rises as Vt falls. PaO2 uses oxygen-content mixing (Hb 12, a-v difference 5 mL/dL) with true shunt + V/Q admixture that fades as FiO2 → 1. Recruitment is S-shaped in end-expiratory alveolar pressure (width 3). BP falls 1.5/cmH2O of P_mean above 12 and 2/cmH2O of PEEP_i. Gas and vitals start at steady state at t = 10 s. ⚠ New values for your review in M5: V/Q mismatch per profile, recruitable fraction / half-PEEP, HR/BP per profile._
-- [ ] **M5 Profiles**: the 8 Patient Profiles + Initial Settings + PBW · **signature tests** (exact formulas, each profile's signature, clinical cause-and-effect)
+- [ ] **M5 Profiles**: the 8 Patient Profiles + Initial Settings + PBW · **signature tests** (exact formulas, each profile's signature, clinical cause-and-effect) _In progress 2026-10-17: registry, Initial Settings, mode-change defaults and PBW done (43 tests). ⏸ **Waiting on you: Round 4** (signature mismatches on Initial Settings)._
 - [ ] **M6 Worker and contract**: Web Worker host, typed versioned messages, Float32Array batching
 - [ ] **M7 UI**: Canvas sweep traces + loops · numbers · settings strip with confirm · mode-change dialog · alarm banner · Instructor Panel · freeze and cursor · gas/vitals panel · i18n scaffold
 - [ ] **M8 Polish and ship**: shareable case URL, localStorage, view-only phone layout, **your clinical review session**, deploy to Vercel

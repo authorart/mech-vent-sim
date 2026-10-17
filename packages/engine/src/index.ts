@@ -44,3 +44,14 @@ export {
   type GasParams,
 } from "./gas";
 export { Circulation, type CirculationParams, type Vitals, type VitalsInputs } from "./vitals";
+export {
+  PROFILES,
+  ANATOMIC_DEAD_SPACE,
+  buildProfile,
+  predictedBodyWeight,
+  type PatientProfile,
+  type ProfileId,
+  type ProfileValues,
+  type Sex,
+} from "./profiles";
+export { INITIAL_SETTINGS, settingsForMode } from "./settings";
