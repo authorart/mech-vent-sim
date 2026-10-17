@@ -21,6 +21,8 @@ export const TRIGGER_LOCKOUT = 0.05;
 export const MAX_PSV_INSP_TIME = 3;
 /** Duration of an Inspiratory Pause or Expiratory Hold maneuver (s). */
 export const HOLD_TIME = 0.5;
+/** Muscle Pressure above this during a pause or hold makes the measurement unreliable (cmH2O). */
+export const MANEUVER_EFFORT_LIMIT = 0.5;
 
 export interface AdvanceResult {
   /** Interleaved Samples; see `SAMPLE` for the layout. */
@@ -57,7 +59,9 @@ interface BreathAccumulator {
   sumPaw: number;
   n: number;
   plateauPaw: number | null;
+  plateauReliable: boolean;
   totalPeep: number | null;
+  totalPeepReliable: boolean;
   endInspRecoil: number;
   endInspPaw: number;
   peakInspFlow: number;
@@ -98,6 +102,8 @@ export class Simulator {
   private heldTrigger: BreathTrigger = "mandatory";
   private psvPeakFlow = 0;
 
+  /** Largest Muscle Pressure seen during the current pause or hold. */
+  private maneuverEffort = 0;
   private inspPauseRequested = false;
   private expHoldRequested = false;
 
@@ -205,6 +211,9 @@ export class Simulator {
     const palv = this.lung.alveolarPressure(this.volume, pmus);
     this.lastPaw = paw;
     this.lastFlow = flow;
+    if (this.phase === "pause" || this.phase === "expiratoryHold") {
+      this.maneuverEffort = Math.max(this.maneuverEffort, pmus);
+    }
 
     if (this.acc) {
       if (dv > 0) this.acc.vti += dv;
@@ -295,16 +304,30 @@ export class Simulator {
         return this.inspirationTransition(t, flow, paw);
       case "pause":
         if (t >= this.phaseEnd - DT / 2) {
-          if (this.acc) this.acc.plateauPaw = paw;
-          this.outEvents.push({ type: "plateauMeasured", t, plateau: paw });
+          const reliable = this.maneuverEffort < MANEUVER_EFFORT_LIMIT;
+          if (this.acc) {
+            this.acc.plateauPaw = paw;
+            this.acc.plateauReliable = reliable;
+          }
+          this.outEvents.push({ type: "plateauMeasured", t, plateau: paw, reliable });
           this.beginExpiration(t);
         }
         return;
       case "expiratoryHold":
         if (t >= this.phaseEnd - DT / 2) {
           const peep = this.settings.peep;
-          if (this.acc) this.acc.totalPeep = paw;
-          this.outEvents.push({ type: "totalPeepMeasured", t, totalPeep: paw, peepI: paw - peep });
+          const reliable = this.maneuverEffort < MANEUVER_EFFORT_LIMIT;
+          if (this.acc) {
+            this.acc.totalPeep = paw;
+            this.acc.totalPeepReliable = reliable;
+          }
+          this.outEvents.push({
+            type: "totalPeepMeasured",
+            t,
+            totalPeep: paw,
+            peepI: paw - peep,
+            reliable,
+          });
           this.startBreath(t, this.heldTrigger);
         }
         return;
@@ -381,6 +404,7 @@ export class Simulator {
       this.expHoldRequested = false;
       this.heldTrigger = trigger;
       this.phase = "expiratoryHold";
+      this.maneuverEffort = 0;
       this.phaseStart = t;
       this.phaseEnd = t + HOLD_TIME;
       return;
@@ -403,6 +427,7 @@ export class Simulator {
     this.inspPauseRequested = false;
     if (pause > 0) {
       this.phase = "pause";
+      this.maneuverEffort = 0;
       this.phaseStart = t;
       this.phaseEnd = t + pause;
     } else {
@@ -442,7 +467,9 @@ export class Simulator {
       sumPaw: 0,
       n: 0,
       plateauPaw: null,
+      plateauReliable: true,
       totalPeep: null,
+      totalPeepReliable: true,
       endInspRecoil: this.recoil,
       endInspPaw: this.lastPaw,
       peakInspFlow: 0,
@@ -494,7 +521,9 @@ export class Simulator {
       endInspRecoil: a.endInspRecoil,
       endExpRecoil: this.recoil,
       plateauPaw: a.plateauPaw,
+      plateauReliable: a.plateauReliable,
       totalPeep: a.totalPeep,
+      totalPeepReliable: a.totalPeepReliable,
       peakInspFlow: a.peakInspFlow,
       cycleFlow: a.cycleFlow,
       highPressureCycled: a.highPressureCycled,

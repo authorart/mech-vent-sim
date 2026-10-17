@@ -4,6 +4,8 @@ import type { BreathRecord, BreathTrigger, Mode } from "./types";
 export interface Measured {
   value: number;
   t: number;
+  /** False when patient effort during the maneuver contaminated it. */
+  reliable: boolean;
 }
 
 /** Breath Metrics: what the ventilator monitor displays after each completed Breath. */
@@ -62,11 +64,12 @@ export class Monitor {
     this.recent = this.recent.filter((r) => r.end > b.endTime - WINDOW);
 
     if (b.plateauPaw !== null) {
-      this.pplat = { value: b.plateauPaw, t: b.endTime };
+      this.pplat = { value: b.plateauPaw, t: b.endTime, reliable: b.plateauReliable };
     }
     if (b.totalPeep !== null) {
-      this.totalPeep = { value: b.totalPeep, t: b.endTime };
-      this.peepI = { value: b.totalPeep - b.peep, t: b.endTime };
+      const reliable = b.totalPeepReliable;
+      this.totalPeep = { value: b.totalPeep, t: b.endTime, reliable };
+      this.peepI = { value: b.totalPeep - b.peep, t: b.endTime, reliable };
     }
 
     const span = Math.min(WINDOW, b.endTime - this.firstStart);

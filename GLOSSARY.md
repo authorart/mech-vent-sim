@@ -91,6 +91,14 @@ Briefly closing the circuit at end-expiration so alveolar and airway pressure eq
 **Inspiratory Pause**:
 Holding inspiration at end-inspiration with no flow. P_plat is read during this pause.
 
+**Sedation Level**:
+How much of the patient's own respiratory drive is allowed through: deep (none), light (half), awake (full). Patients start deeply sedated.
+_Avoid_: paralysis (that's a different thing), consciousness
+
+**Chemoreflex**:
+The patient's drive rising as arterial pH falls and fading as pH rises, so drive stops near the apneic threshold.
+_Avoid_: CO2 response, feedback
+
 ## Patient–ventilator interaction
 
 **Trigger**:

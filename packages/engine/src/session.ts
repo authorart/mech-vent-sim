@@ -1,8 +1,11 @@
+import { chemoreflexMultiplier, effectiveDrive, type SedationLevel } from "./drive";
 import { AlarmEngine, type AlarmEvent, type AlarmLimits } from "./alarms";
 import { GasExchange, type BloodGas, type GasInputs, type GasParams } from "./gas";
 import { Monitor, type BreathMetrics } from "./monitor";
 import { Simulator, type SimulatorOptions } from "./simulator";
-import type { BreathRecord, EngineEvent } from "./types";
+import { PROFILES, type ProfileId } from "./profiles";
+import { INITIAL_SETTINGS } from "./settings";
+import type { BreathRecord, Drive, EngineEvent, VentSettings } from "./types";
 import { Circulation, type CirculationParams, type Vitals } from "./vitals";
 
 export interface SessionStep {
@@ -18,6 +21,10 @@ export interface SessionOptions extends SimulatorOptions {
   alarmLimits?: AlarmLimits;
   gas?: GasParams;
   circulation?: CirculationParams;
+  /** Starting sedation (default: deep). The patient's drive is scaled from `patient.drive`. */
+  sedation?: SedationLevel;
+  /** Chemoreflex reference pH (default 7.40). */
+  referencePh?: number;
 }
 
 /** Healthy adult gas exchange, used when a Session is created without profile values. */
@@ -48,12 +55,23 @@ export class Session {
   /** Physiological time runs this many times faster than the waveforms (fast-forward). */
   gasTimeScale = 1;
 
+  /** The profile's drive at its reference pH, before sedation and chemoreflex. */
+  baseDrive: Drive;
+  sedation: SedationLevel;
+  referencePh: number;
+
   private latest: BreathMetrics | null = null;
   private latestRecord: BreathRecord | null = null;
   private lastReport = 0;
 
   constructor(opts: SessionOptions) {
-    this.sim = new Simulator(opts);
+    this.baseDrive = { ...opts.patient.drive };
+    this.sedation = opts.sedation ?? "deep";
+    this.referencePh = opts.referencePh ?? 7.4;
+    this.sim = new Simulator({
+      ...opts,
+      patient: { ...opts.patient, drive: effectiveDrive(this.baseDrive, this.sedation, 1) },
+    });
     this.alarms = new AlarmEngine(opts.alarmLimits);
     this.gas = new GasExchange({ ...(opts.gas ?? NORMAL_GAS) });
     this.circulation = new Circulation({ ...(opts.circulation ?? NORMAL_CIRCULATION) });
@@ -63,7 +81,18 @@ export class Session {
     return this.latest;
   }
 
+  /** The drive currently applied, after sedation and chemoreflex. */
+  get appliedDrive(): Drive {
+    return this.sim.effort.drive;
+  }
+
+  setSedation(level: SedationLevel): void {
+    this.sedation = level;
+    this.updateDrive();
+  }
+
   advance(seconds: number): SessionStep {
+    this.updateDrive();
     const r = this.sim.advance(seconds);
     const alarms: AlarmEvent[] = [];
     const metrics: BreathMetrics[] = [];
@@ -130,10 +159,37 @@ export class Session {
     return gas && vitals ? { t, gas, vitals } : null;
   }
 
+  private updateDrive(): void {
+    const m = chemoreflexMultiplier(this.gas.state?.ph ?? null, this.referencePh);
+    this.sim.setPatient({ drive: effectiveDrive(this.baseDrive, this.sedation, m) });
+  }
+
   private gasInputs(): GasInputs {
     return {
       fio2: this.sim.currentSettings.fio2,
       endExpAlveolarPressure: this.latestRecord?.endExpRecoil ?? this.sim.currentSettings.peep,
     };
   }
+}
+
+export interface ProfileSessionOptions {
+  settings?: VentSettings;
+  sedation?: SedationLevel;
+  alarmLimits?: AlarmLimits;
+  firstEffortAt?: number;
+}
+
+/** A Session for a Patient Profile, starting on the Initial Settings and deeply sedated. */
+export function createProfileSession(id: ProfileId, opts: ProfileSessionOptions = {}): Session {
+  const p = PROFILES[id];
+  return new Session({
+    patient: p.patient,
+    settings: opts.settings ?? INITIAL_SETTINGS,
+    gas: p.gas,
+    circulation: p.circulation,
+    referencePh: p.referencePh,
+    sedation: opts.sedation ?? "deep",
+    ...(opts.alarmLimits ? { alarmLimits: opts.alarmLimits } : {}),
+    ...(opts.firstEffortAt !== undefined ? { firstEffortAt: opts.firstEffortAt } : {}),
+  });
 }

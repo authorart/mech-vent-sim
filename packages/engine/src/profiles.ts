@@ -22,6 +22,8 @@ export interface PatientProfile {
   circulation: CirculationParams;
   /** Recommended lung-protective tidal volume (mL/kg PBW). */
   recommendedVtPerKg: number;
+  /** Arterial pH at which the profile's drive applies unchanged (chemoreflex reference). */
+  referencePh: number;
 }
 
 /**
@@ -44,6 +46,8 @@ export interface ProfileValues {
   hr: number;
   sbp: number;
   dbp: number;
+  /** Presenting pH: the chemoreflex reference. */
+  referencePh: number;
 }
 
 export const ANATOMIC_DEAD_SPACE = 0.125;
@@ -65,6 +69,7 @@ export function buildProfile(
     name,
     summary,
     recommendedVtPerKg,
+    referencePh: v.referencePh,
     patient: {
       mechanics: { compliance: v.compliance / 1000, rInsp: v.rInsp, rExp: v.rExp },
       drive: { neuralRate: v.neuralRate, pmusMax: v.pmusMax, inspFraction: INSP_FRACTION },
@@ -109,6 +114,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 80,
       sbp: 120,
       dbp: 75,
+      referencePh: 7.4,
     },
   ),
   ards: buildProfile(
@@ -131,6 +137,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 105,
       sbp: 110,
       dbp: 65,
+      referencePh: 7.3,
     },
     6,
   ),
@@ -141,7 +148,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
     {
       compliance: 45,
       rInsp: 25,
-      rExp: 55,
+      rExp: 90,
       vco2: 220,
       vdvt: 0.45,
       shunt: 0.08,
@@ -154,6 +161,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 120,
       sbp: 135,
       dbp: 80,
+      referencePh: 7.3,
     },
   ),
   copd: buildProfile(
@@ -163,7 +171,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
     {
       compliance: 80,
       rInsp: 20,
-      rExp: 50,
+      rExp: 75,
       vco2: 200,
       vdvt: 0.5,
       shunt: 0.08,
@@ -176,6 +184,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 100,
       sbp: 140,
       dbp: 80,
+      referencePh: 7.35,
     },
   ),
   metabolicAcidosis: buildProfile(
@@ -196,6 +205,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 125,
       sbp: 100,
       dbp: 55,
+      referencePh: 7.1,
     },
   ),
   cardiogenicEdema: buildProfile(
@@ -218,6 +228,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 110,
       sbp: 160,
       dbp: 95,
+      referencePh: 7.3,
     },
   ),
   massivePe: buildProfile(
@@ -239,6 +250,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 125,
       sbp: 90,
       dbp: 60,
+      referencePh: 7.35,
     },
   ),
   centralApnea: buildProfile(
@@ -259,6 +271,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 70,
       sbp: 115,
       dbp: 70,
+      referencePh: 7.4,
     },
   ),
 };

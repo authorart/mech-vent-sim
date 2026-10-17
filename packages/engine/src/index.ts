@@ -12,6 +12,7 @@ export {
   TRIGGER_LOCKOUT,
   MAX_PSV_INSP_TIME,
   HOLD_TIME,
+  MANEUVER_EFFORT_LIMIT,
   type AdvanceResult,
   type SimulatorOptions,
 } from "./simulator";
@@ -32,6 +33,8 @@ export {
   NORMAL_GAS,
   NORMAL_CIRCULATION,
   PHYSIOLOGY_PRIME_TIME,
+  createProfileSession,
+  type ProfileSessionOptions,
   type SessionOptions,
   type SessionStep,
 } from "./session";
@@ -55,3 +58,10 @@ export {
   type Sex,
 } from "./profiles";
 export { INITIAL_SETTINGS, settingsForMode } from "./settings";
+export {
+  APNEIC_PH,
+  SEDATION_FACTOR,
+  chemoreflexMultiplier,
+  effectiveDrive,
+  type SedationLevel,
+} from "./drive";

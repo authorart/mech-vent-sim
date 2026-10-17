@@ -119,8 +119,12 @@ export interface BreathRecord {
   endExpRecoil: number;
   /** Airway pressure at the end of the inspiratory pause, when a pause occurred. */
   plateauPaw: number | null;
+  /** False when the patient made an effort during the pause. */
+  plateauReliable: boolean;
   /** Total PEEP measured by an Expiratory Hold at the end of this breath. */
   totalPeep: number | null;
+  /** False when the patient made an effort during the hold. */
+  totalPeepReliable: boolean;
   peakInspFlow: number;
   /** Flow at the moment inspiration ended (L/s). */
   cycleFlow: number;
@@ -134,8 +138,14 @@ export type EngineEvent =
   | { type: "apneaBackupStarted"; t: number }
   | { type: "apneaBackupEnded"; t: number }
   | { type: "highPressureCycle"; t: number; paw: number }
-  | { type: "plateauMeasured"; t: number; plateau: number }
-  | { type: "totalPeepMeasured"; t: number; totalPeep: number; peepI: number };
+  | { type: "plateauMeasured"; t: number; plateau: number; reliable: boolean }
+  | {
+      type: "totalPeepMeasured";
+      t: number;
+      totalPeep: number;
+      peepI: number;
+      reliable: boolean;
+    };
 
 /** Interleaved Sample layout in the output Float32Array. */
 export const SAMPLE = {
