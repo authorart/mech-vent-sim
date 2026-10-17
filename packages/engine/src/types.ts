@@ -99,6 +99,8 @@ export interface BreathRecord {
   endTime: number;
   trigger: BreathTrigger;
   mode: Mode;
+  /** Set PEEP during this breath (cmH2O). */
+  peep: number;
   /** Time from breath start to start of expiration, including any pause (s). */
   inspTime: number;
   /** Inspired volume (L). */
@@ -106,13 +108,19 @@ export interface BreathRecord {
   /** Expired volume (L, positive). */
   vte: number;
   peakPaw: number;
+  /** Airway pressure when inspiratory flow stopped (before any pause). */
+  endInspPaw: number;
   meanPaw: number;
   /** Airway pressure at the end of the breath's expiration. */
   endExpPaw: number;
-  /** True alveolar pressure at the end of expiration (Engine truth; the UI measures PEEP_i with an Expiratory Hold). */
-  endExpPalv: number;
+  /** Engine truth: elastic recoil pressure (V/C) at the end of inspiration. The UI measures P_plat with a pause. */
+  endInspRecoil: number;
+  /** Engine truth: elastic recoil pressure at the end of expiration. Minus PEEP, this is the true PEEP_i. */
+  endExpRecoil: number;
   /** Airway pressure at the end of the inspiratory pause, when a pause occurred. */
   plateauPaw: number | null;
+  /** Total PEEP measured by an Expiratory Hold at the end of this breath. */
+  totalPeep: number | null;
   peakInspFlow: number;
   /** Flow at the moment inspiration ended (L/s). */
   cycleFlow: number;
@@ -125,7 +133,9 @@ export type EngineEvent =
   | { type: "settingsApplied"; t: number }
   | { type: "apneaBackupStarted"; t: number }
   | { type: "apneaBackupEnded"; t: number }
-  | { type: "highPressureCycle"; t: number; paw: number };
+  | { type: "highPressureCycle"; t: number; paw: number }
+  | { type: "plateauMeasured"; t: number; plateau: number }
+  | { type: "totalPeepMeasured"; t: number; totalPeep: number; peepI: number };
 
 /** Interleaved Sample layout in the output Float32Array. */
 export const SAMPLE = {

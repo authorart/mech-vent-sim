@@ -19,6 +19,8 @@ export const TRIGGER_DELAY = 0.08;
 export const TRIGGER_LOCKOUT = 0.05;
 /** Safety cap on pressure-support inspiration (s). */
 export const MAX_PSV_INSP_TIME = 3;
+/** Duration of an Inspiratory Pause or Expiratory Hold maneuver (s). */
+export const HOLD_TIME = 0.5;
 
 export interface AdvanceResult {
   /** Interleaved Samples; see `SAMPLE` for the layout. */
@@ -41,7 +43,8 @@ type ActiveBreath =
   | { kind: "PCV"; pInsp: number; inspTime: number; riseTime: number }
   | { kind: "PSV"; pSupport: number; riseTime: number; esens: number };
 
-type Phase = "inspiration" | "pause" | "expiration";
+/** `pause` = valves closed after inspiration; `expiratoryHold` = valves closed before the next breath. */
+type Phase = "inspiration" | "pause" | "expiration" | "expiratoryHold";
 
 interface BreathAccumulator {
   startTime: number;
@@ -54,6 +57,9 @@ interface BreathAccumulator {
   sumPaw: number;
   n: number;
   plateauPaw: number | null;
+  totalPeep: number | null;
+  endInspRecoil: number;
+  endInspPaw: number;
   peakInspFlow: number;
   cycleFlow: number;
   highPressureCycled: boolean;
@@ -84,15 +90,19 @@ export class Simulator {
 
   private phase: Phase = "expiration";
   private phaseStart = 0;
+  private phaseEnd = 0;
   private breath: ActiveBreath | null = null;
   private acc: BreathAccumulator | null = null;
   private lastBreathStart = 0;
   private triggerAt: number | null = null;
+  private heldTrigger: BreathTrigger = "mandatory";
   private psvPeakFlow = 0;
+
+  private inspPauseRequested = false;
+  private expHoldRequested = false;
 
   private lastPaw: number;
   private lastFlow = 0;
-  private lastPalv: number;
 
   private outSamples: number[] = [];
   private outBreaths: BreathRecord[] = [];
@@ -104,7 +114,6 @@ export class Simulator {
     this.effort = new PatientEffort({ ...opts.patient.drive }, opts.firstEffortAt ?? 1);
     this.volume = this.lung.volumeAtPressure(this.settings.peep);
     this.lastPaw = this.settings.peep;
-    this.lastPalv = this.settings.peep;
     if (this.settings.mode !== "PSV") this.startBreath(0, "mandatory");
   }
 
@@ -114,6 +123,10 @@ export class Simulator {
 
   get currentSettings(): VentSettings {
     return this.settings;
+  }
+
+  get pendingSettings(): VentSettings | null {
+    return this.pending;
   }
 
   get isApneaBackupActive(): boolean {
@@ -129,6 +142,16 @@ export class Simulator {
   setPatient(patient: Partial<Patient>): void {
     if (patient.mechanics) this.lung.mechanics = { ...patient.mechanics };
     if (patient.drive) this.effort.drive = { ...patient.drive };
+  }
+
+  /** Hold the end of the next inspiration (no flow) to measure P_plat. */
+  inspiratoryPause(): void {
+    this.inspPauseRequested = true;
+  }
+
+  /** Hold the end of the next expiration (no flow) to measure Total PEEP. */
+  expiratoryHold(): void {
+    this.expHoldRequested = true;
   }
 
   /** Leave Apnea Backup and go back to pressure support. */
@@ -182,7 +205,6 @@ export class Simulator {
     const palv = this.lung.alveolarPressure(this.volume, pmus);
     this.lastPaw = paw;
     this.lastFlow = flow;
-    this.lastPalv = palv;
 
     if (this.acc) {
       if (dv > 0) this.acc.vti += dv;
@@ -200,6 +222,11 @@ export class Simulator {
     }
 
     this.transition(t, flow, paw);
+  }
+
+  /** Elastic recoil pressure (cmH2O): alveolar pressure with no effort. */
+  private get recoil(): number {
+    return this.lung.alveolarPressure(this.volume, 0);
   }
 
   private flowFor(control: Control, t: number, v: number): number {
@@ -235,11 +262,11 @@ export class Simulator {
   private control(): Control {
     const peep = this.settings.peep;
     const b = this.breath;
+    if (this.phase === "pause" || this.phase === "expiratoryHold") return { kind: "closed" };
     if (this.phase === "expiration" || !b) {
       // Flow triggering assumes bias flow, so the patient can draw gas at PEEP.
       return { kind: "expiratory", peep, oneWay: this.settings.trigger.type === "pressure" };
     }
-    if (this.phase === "pause") return { kind: "closed" };
 
     const start = this.phaseStart;
     switch (b.kind) {
@@ -263,60 +290,69 @@ export class Simulator {
   }
 
   private transition(t: number, flow: number, paw: number): void {
-    const tIn = t - this.phaseStart;
-    const b = this.breath;
-
-    if (this.phase === "inspiration" && b) {
-      if (paw > this.settings.highPressureLimit) {
-        if (this.acc) this.acc.highPressureCycled = true;
-        this.outEvents.push({ type: "highPressureCycle", t, paw });
-        this.beginExpiration(t, flow);
+    switch (this.phase) {
+      case "inspiration":
+        return this.inspirationTransition(t, flow, paw);
+      case "pause":
+        if (t >= this.phaseEnd - DT / 2) {
+          if (this.acc) this.acc.plateauPaw = paw;
+          this.outEvents.push({ type: "plateauMeasured", t, plateau: paw });
+          this.beginExpiration(t);
+        }
         return;
-      }
-      switch (b.kind) {
-        case "VCV":
-          if (tIn >= b.tiFlow - DT / 2) {
-            if (b.pause > 0) {
-              this.phase = "pause";
-              if (this.acc) this.acc.cycleFlow = flow;
-            } else this.beginExpiration(t, flow);
-          }
-          break;
-        case "PCV":
-          if (tIn >= b.inspTime - DT / 2) this.beginExpiration(t, flow);
-          break;
-        case "PSV":
-          this.psvPeakFlow = Math.max(this.psvPeakFlow, flow);
-          if (
-            (tIn >= b.riseTime && flow <= b.esens * this.psvPeakFlow) ||
-            tIn >= MAX_PSV_INSP_TIME
-          ) {
-            this.beginExpiration(t, flow);
-          }
-          break;
-      }
+      case "expiratoryHold":
+        if (t >= this.phaseEnd - DT / 2) {
+          const peep = this.settings.peep;
+          if (this.acc) this.acc.totalPeep = paw;
+          this.outEvents.push({ type: "totalPeepMeasured", t, totalPeep: paw, peepI: paw - peep });
+          this.startBreath(t, this.heldTrigger);
+        }
+        return;
+      case "expiration":
+        return this.expirationTransition(t, flow, paw);
+    }
+  }
+
+  private inspirationTransition(t: number, flow: number, paw: number): void {
+    const b = this.breath;
+    if (!b) return;
+    const tIn = t - this.phaseStart;
+
+    if (paw > this.settings.highPressureLimit) {
+      if (this.acc) this.acc.highPressureCycled = true;
+      this.outEvents.push({ type: "highPressureCycle", t, paw });
+      this.inspPauseRequested = false;
+      this.endInspiration(t, flow, 0);
       return;
     }
-
-    if (this.phase === "pause" && b?.kind === "VCV") {
-      if (tIn >= b.tiFlow + b.pause - DT / 2) {
-        if (this.acc) this.acc.plateauPaw = paw;
-        this.beginExpiration(t, this.acc?.cycleFlow ?? 0);
-      }
-      return;
+    switch (b.kind) {
+      case "VCV":
+        if (tIn >= b.tiFlow - DT / 2) this.endInspiration(t, flow, b.pause);
+        break;
+      case "PCV":
+        if (tIn >= b.inspTime - DT / 2) this.endInspiration(t, flow, 0);
+        break;
+      case "PSV":
+        this.psvPeakFlow = Math.max(this.psvPeakFlow, flow);
+        if ((tIn >= b.riseTime && flow <= b.esens * this.psvPeakFlow) || tIn >= MAX_PSV_INSP_TIME) {
+          this.endInspiration(t, flow, 0);
+        }
+        break;
     }
+  }
 
-    // Expiration: delayed patient trigger, then mandatory timing, then apnea, then trigger detection.
+  private expirationTransition(t: number, flow: number, paw: number): void {
+    // Order: delayed patient trigger, mandatory timing, apnea, then trigger detection.
     if (this.triggerAt !== null && t >= this.triggerAt - DT / 2) {
       this.triggerAt = null;
-      this.startBreath(t, "patient");
+      this.breathDue(t, "patient");
       return;
     }
 
     const timing = this.pending ?? this.settings;
     const rate = this.mandatoryRate(timing);
     if (rate > 0 && t - this.lastBreathStart >= 60 / rate - DT / 2) {
-      this.startBreath(t, this.backupActive ? "backup" : "mandatory");
+      this.breathDue(t, this.backupActive ? "backup" : "mandatory");
       return;
     }
 
@@ -327,11 +363,11 @@ export class Simulator {
     ) {
       this.backupActive = true;
       this.outEvents.push({ type: "apneaBackupStarted", t });
-      this.startBreath(t, "backup");
+      this.breathDue(t, "backup");
       return;
     }
 
-    if (this.triggerAt === null && tIn >= TRIGGER_LOCKOUT) {
+    if (this.triggerAt === null && t - this.phaseStart >= TRIGGER_LOCKOUT) {
       const trig = this.settings.trigger;
       const fired =
         trig.type === "flow" ? flow >= trig.threshold : paw <= this.settings.peep - trig.threshold;
@@ -339,16 +375,43 @@ export class Simulator {
     }
   }
 
+  /** A breath should start now, unless an Expiratory Hold was requested first. */
+  private breathDue(t: number, trigger: BreathTrigger): void {
+    if (this.expHoldRequested) {
+      this.expHoldRequested = false;
+      this.heldTrigger = trigger;
+      this.phase = "expiratoryHold";
+      this.phaseStart = t;
+      this.phaseEnd = t + HOLD_TIME;
+      return;
+    }
+    this.startBreath(t, trigger);
+  }
+
   private mandatoryRate(s: VentSettings): number {
     if (s.mode === "PSV") return this.backupActive ? s.backup.rate : 0;
     return s.rate;
   }
 
-  private beginExpiration(t: number, flowAtCycle: number): void {
+  private endInspiration(t: number, flow: number, setPause: number): void {
     if (this.acc) {
-      this.acc.inspEnd = t;
-      if (this.phase === "inspiration") this.acc.cycleFlow = flowAtCycle;
+      this.acc.cycleFlow = flow;
+      this.acc.endInspRecoil = this.recoil;
+      this.acc.endInspPaw = this.lastPaw;
     }
+    const pause = this.inspPauseRequested ? Math.max(HOLD_TIME, setPause) : setPause;
+    this.inspPauseRequested = false;
+    if (pause > 0) {
+      this.phase = "pause";
+      this.phaseStart = t;
+      this.phaseEnd = t + pause;
+    } else {
+      this.beginExpiration(t);
+    }
+  }
+
+  private beginExpiration(t: number): void {
+    if (this.acc) this.acc.inspEnd = t;
     this.phase = "expiration";
     this.phaseStart = t;
   }
@@ -379,6 +442,9 @@ export class Simulator {
       sumPaw: 0,
       n: 0,
       plateauPaw: null,
+      totalPeep: null,
+      endInspRecoil: this.recoil,
+      endInspPaw: this.lastPaw,
       peakInspFlow: 0,
       cycleFlow: 0,
       highPressureCycled: false,
@@ -417,14 +483,18 @@ export class Simulator {
       endTime: t,
       trigger: a.trigger,
       mode: a.mode,
+      peep: this.settings.peep,
       inspTime: (a.inspEnd ?? t) - a.startTime,
       vti: a.vti,
       vte: a.vte,
       peakPaw: a.peakPaw,
+      endInspPaw: a.endInspPaw,
       meanPaw: a.n > 0 ? a.sumPaw / a.n : this.lastPaw,
       endExpPaw: this.lastPaw,
-      endExpPalv: this.lastPalv,
+      endInspRecoil: a.endInspRecoil,
+      endExpRecoil: this.recoil,
       plateauPaw: a.plateauPaw,
+      totalPeep: a.totalPeep,
       peakInspFlow: a.peakInspFlow,
       cycleFlow: a.cycleFlow,
       highPressureCycled: a.highPressureCycled,

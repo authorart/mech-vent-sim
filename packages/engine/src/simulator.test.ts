@@ -130,7 +130,7 @@ describe("Expiration", () => {
 describe("Intrinsic PEEP (comes out of the mechanics, ADR-0002/0003)", () => {
   const steadyPeepI = (rate: number) => {
     const { breaths } = run(asthma, vcv({ tidalVolume: 0.6, rate }), 90);
-    return last(breaths).endExpPalv - 5;
+    return last(breaths).endExpRecoil - 5;
   };
 
   it("matches the analytic steady state for obstructive mechanics", () => {
