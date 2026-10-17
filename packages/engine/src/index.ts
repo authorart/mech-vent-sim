@@ -70,3 +70,4 @@ export {
   type ProfilePatch,
 } from "./protocol";
 export { EngineHost, MAX_TICK, type Post } from "./host";
+export { decodeCase, encodeCase, diffFromProfile, type CaseState } from "./case";

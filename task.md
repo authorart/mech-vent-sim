@@ -3,7 +3,7 @@
 Source specs: [simulation-engine.md](./simulation-engine.md) (the Engine spec) · [Recommended-Simulator-Architecture.md](./Recommended-Simulator-Architecture.md) (stack)
 Domain language: [GLOSSARY.md](./GLOSSARY.md) · Decisions: [docs/adr/](./docs/adr/)
 
-**Status:** 🟢 Design confirmed 2026-10-17. V1 implementation in progress. Repo: https://github.com/authorart/mech-vent-sim
+**Status:** 🟢 Design confirmed 2026-10-17. V1 built (M1–M7 done, M8 waiting on your clinical review and the deploy). Repo: https://github.com/authorart/mech-vent-sim
 
 ---
 
@@ -110,6 +110,10 @@ Each milestone ends with its tests passing and an update here.
 - [x] **M6 Worker and contract**: Web Worker host, typed versioned messages, Float32Array batching _Done 2026-10-17: contract v2 (`protocol.ts`: 14 commands, 8 message types, `EngineState` snapshot). `EngineHost` runs the Session behind it with no timers (tested in Node, 8 tests, 70 total). The web Worker ticks every 16 ms with each real-time step capped at 100 ms. `EngineClient` is the main-thread handle. Waveform pause (instructor) is separate from the display freeze (UI, M7)._
 - [x] **M7 UI**: Canvas sweep traces + loops · numbers · settings strip with confirm · mode-change dialog · alarm banner · Instructor Panel · freeze and cursor · gas/vitals panel · i18n scaffold _Done 2026-10-17: checked in a headless browser (screenshots of ARDS, asthma, pending settings, mode dialog, Instructor Panel, loops, freeze + cursor, phone). Design: blue-slate monitor glass, trace colors checked with the dataviz validator (pressure #C08A1E, flow #18977E, volume #6C7CF0), Barlow / Barlow Condensed, alarm red/yellow reserved for alarms and paired with a shape. Fixed during the check: knob clicks in quick succession lost updates; cursor readout crashed off the plot edge (error.tsx boundary added); Date.now() during render broke Cache Components prerender. ⚠ Dev server is unreliable inside OneDrive (sync keeps touching node_modules); verify with `next build && next start`._
 - [ ] **M8 Polish and ship**: shareable case URL, localStorage, view-only phone layout, **your clinical review session**, deploy to Vercel
+  - [x] Shareable case URL (`#case=…`, checked and clamped on decode, 5 tests) + "Copy case link" in the Instructor Panel. Last session remembered in localStorage. Checked in the browser: reload restores the session, a link alone reproduces the case, a malformed link falls back safely (75 tests total)
+  - [x] View-only phone layout (checked at 390 px in M7)
+  - [ ] **Your clinical review session**: values flagged ⚠ in M3/M4/M5 above
+  - [ ] **Deploy to Vercel**: needs your go-ahead and your Vercel account
 
 ### V2 backlog
 

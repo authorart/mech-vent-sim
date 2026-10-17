@@ -28,3 +28,12 @@ corepack pnpm typecheck
 corepack pnpm lint
 corepack pnpm build
 ```
+
+> **OneDrive note:** OneDrive sync keeps touching `node_modules`, which stalls `next dev` ("waiting for the filesystem to settle"). Either move the repo outside OneDrive, or use `corepack pnpm build` then `corepack pnpm --filter web start`.
+
+## Using it
+
+- **Settings strip** (bottom): change knobs, then **Confirm**. Changes apply at the next breath. Mode buttons open a dialog to check the new mode's settings.
+- **Insp. pause / Exp. hold** measure P_plat and Total PEEP (PEEP_i).
+- **Freeze** stops the traces; move over them to read values.
+- **Instructor** panel: load a Patient Profile (starts deeply sedated on the Initial Settings), change sedation and patient values live, speed up blood gases, and **Copy case link** to share the exact case.

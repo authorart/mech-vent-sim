@@ -67,6 +67,10 @@ export const en = {
   fastForward: "Blood-gas speed",
   endBackup: "End apnea backup",
   reset: "Restart on Initial Settings",
+  shareHeading: "Share this case",
+  shareCase: "Copy case link",
+  shareCopied: "Link copied. Anyone who opens it starts from this exact case.",
+  shareManual: "Copy the link below.",
   apneaBackupActive: "Apnea backup is ventilating the patient",
 
   bloodGas: "Blood gas",

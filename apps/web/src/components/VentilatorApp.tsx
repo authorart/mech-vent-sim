@@ -12,7 +12,7 @@ import { TopBar } from "./TopBar";
 import { Waveforms } from "./Waveforms";
 
 export function VentilatorApp() {
-  useEngine({ profileId: "ards" });
+  useEngine("ards");
   const connection = useStore((s) => s.connection);
   const error = useStore((s) => s.error);
   const backup = useStore((s) => s.engine?.apneaBackupActive);

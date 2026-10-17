@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { num } from "@/engine/format";
 import { usePbw, useStore } from "@/engine/store";
+import { caseLink, currentCase } from "@/engine/useEngine";
 import { messages as m } from "@/i18n";
 
 function Slider({
@@ -93,6 +94,48 @@ function Segmented<T extends string>({
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Copies a link that reopens this exact case (profile, changes, settings, sedation). */
+function ShareCase() {
+  const [link, setLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={async () => {
+          const c = currentCase();
+          if (!c) return;
+          const url = caseLink(c);
+          setLink(url);
+          try {
+            await navigator.clipboard.writeText(url);
+            setCopied(true);
+          } catch {
+            setCopied(false);
+          }
+        }}
+        className="rounded bg-pending px-3 py-1.5 text-sm font-medium text-chrome"
+      >
+        {m.shareCase}
+      </button>
+      {link && (
+        <>
+          <p role="status" className="text-xs text-ink-3">
+            {copied ? m.shareCopied : m.shareManual}
+          </p>
+          <input
+            readOnly
+            value={link}
+            aria-label={m.shareCase}
+            onFocus={(e) => e.currentTarget.select()}
+            className="w-full rounded border border-edge bg-panel px-2 py-1 text-xs text-ink-2"
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -299,6 +342,10 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
           step={1}
           onChange={(v) => patch({ drive: { pmusMax: v } })}
         />
+      </Section>
+
+      <Section title={m.shareHeading}>
+        <ShareCase />
       </Section>
 
       <Section title={m.simulation}>
