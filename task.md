@@ -3,7 +3,7 @@
 Source specs: [simulation-engine.md](./simulation-engine.md) (the Engine spec) · [Recommended-Simulator-Architecture.md](./Recommended-Simulator-Architecture.md) (stack)
 Domain language: [GLOSSARY.md](./GLOSSARY.md) · Decisions: [docs/adr/](./docs/adr/)
 
-**Status:** 🟢 Design confirmed 2026-10-17. V1 built (M1–M7 done, M8 waiting on your clinical review and the deploy). Repo: https://github.com/authorart/mech-vent-sim
+**Status:** ✅ V1 prototype complete 2026-10-17. Live at https://mech-vent-sim.vercel.app. Next: the V2 backlog (needs a design round first). Repo: https://github.com/authorart/mech-vent-sim
 
 ---
 
@@ -109,11 +109,11 @@ Each milestone ends with its tests passing and an update here.
 - [x] **M5 Profiles**: the 8 Patient Profiles + Initial Settings + PBW · **signature tests** (exact formulas, each profile's signature, clinical cause-and-effect) _Done 2026-10-17: 62 tests total, including 19 profile-signature tests (ARDS, asthma, COPD, metabolic acidosis sedated/awake/PSV, edema PEEP response, PE, apnea, unreliable maneuvers). Values added in M4/M5 for your review: V/Q mismatch (normal/MA/apnea 0.02, ARDS 0.05, edema/PE 0.10, asthma/COPD 0.15) · recruitable fraction / half-PEEP (ARDS 0.5 / 12, edema 0.7 / 8, others 0) · HR and BP (normal 80 120/75, ARDS 105 110/65, asthma 120 135/80, COPD 100 140/80, MA 125 100/55, edema 110 160/95, PE 125 90/60, apnea 70 115/70). Note: on Initial Settings a hyperventilated awake patient (pH > 7.50) stops triggering; that is the chemoreflex working as designed._
 - [x] **M6 Worker and contract**: Web Worker host, typed versioned messages, Float32Array batching _Done 2026-10-17: contract v2 (`protocol.ts`: 14 commands, 8 message types, `EngineState` snapshot). `EngineHost` runs the Session behind it with no timers (tested in Node, 8 tests, 70 total). The web Worker ticks every 16 ms with each real-time step capped at 100 ms. `EngineClient` is the main-thread handle. Waveform pause (instructor) is separate from the display freeze (UI, M7)._
 - [x] **M7 UI**: Canvas sweep traces + loops · numbers · settings strip with confirm · mode-change dialog · alarm banner · Instructor Panel · freeze and cursor · gas/vitals panel · i18n scaffold _Done 2026-10-17: checked in a headless browser (screenshots of ARDS, asthma, pending settings, mode dialog, Instructor Panel, loops, freeze + cursor, phone). Design: blue-slate monitor glass, trace colors checked with the dataviz validator (pressure #C08A1E, flow #18977E, volume #6C7CF0), Barlow / Barlow Condensed, alarm red/yellow reserved for alarms and paired with a shape. Fixed during the check: knob clicks in quick succession lost updates; cursor readout crashed off the plot edge (error.tsx boundary added); Date.now() during render broke Cache Components prerender. ⚠ Dev server is unreliable inside OneDrive (sync keeps touching node_modules); verify with `next build && next start`._
-- [ ] **M8 Polish and ship**: shareable case URL, localStorage, view-only phone layout, **your clinical review session**, deploy to Vercel
+- [x] **M8 Polish and ship**: shareable case URL, localStorage, view-only phone layout, **your clinical review session**, deploy to Vercel
   - [x] Shareable case URL (`#case=…`, checked and clamped on decode, 5 tests) + "Copy case link" in the Instructor Panel. Last session remembered in localStorage. Checked in the browser: reload restores the session, a link alone reproduces the case, a malformed link falls back safely (75 tests total)
   - [x] View-only phone layout (checked at 390 px in M7)
-  - [ ] **Your clinical review session**: values flagged ⚠ in M3/M4/M5 above
-  - [ ] **Deploy to Vercel**: needs your go-ahead and your Vercel account
+  - [x] Clinical review: you accepted all flagged values as-is for the first prototype (2026-10-17). They stay flagged ⚠ above for a later review
+  - [x] Deployed to Vercel (project `mech-vent-sim`, root `apps/web`, Node 24): **https://mech-vent-sim.vercel.app**. Checked live in a headless browser
 
 ### V2 backlog
 

@@ -2,6 +2,8 @@
 
 A web-based mechanical ventilation **teaching** simulator. Learners adjust ventilator settings on a simulated patient and watch pressure, flow and volume waveforms, breath metrics, blood gases and alarms respond the way physiology says they should.
 
+**Live:** https://mech-vent-sim.vercel.app
+
 > ⚠️ **Education only. Not for clinical use.** This software is not a medical device and must not inform patient care.
 
 ## Repository layout
@@ -37,3 +39,7 @@ corepack pnpm build
 - **Insp. pause / Exp. hold** measure P_plat and Total PEEP (PEEP_i).
 - **Freeze** stops the traces; move over them to read values.
 - **Instructor** panel: load a Patient Profile (starts deeply sedated on the Initial Settings), change sedation and patient values live, speed up blood gases, and **Copy case link** to share the exact case.
+
+## Deploying
+
+Vercel project `mech-vent-sim` (root directory `apps/web`). From the repo root: `npx vercel deploy --prod`.
