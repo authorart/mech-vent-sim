@@ -25,12 +25,15 @@ function SettingsEditor({
   base,
   onChange,
   showBackup,
+  layout = "wrap",
 }: {
   value: VentSettings;
   base: VentSettings | null;
   /** Receives an updater so rapid changes compose instead of overwriting each other. */
   onChange: (update: (s: VentSettings) => VentSettings) => void;
   showBackup: boolean;
+  /** "strip" keeps knobs on one scrolling row on phones. */
+  layout?: "strip" | "wrap";
 }) {
   const pbw = usePbw();
   const changed = (key: string) => base !== null && getValue(base, key) !== getValue(value, key);
@@ -59,7 +62,9 @@ function SettingsEditor({
 
   const trig = value.trigger;
   return (
-    <div className="flex flex-wrap items-stretch gap-2">
+    <div
+      className={`flex items-stretch gap-2 ${layout === "strip" ? "flex-nowrap lg:flex-wrap" : "flex-wrap"}`}
+    >
       {KNOBS[value.mode].map(knob)}
       {value.mode === "VCV" && (
         <Toggle
@@ -92,8 +97,8 @@ function SettingsEditor({
       />
       {knob(TRIGGER_KNOB[trig.type])}
       {showBackup && value.mode === "PSV" && (
-        <div className="flex items-stretch gap-2 border-l border-edge pl-2">
-          <span className="self-center text-xs text-ink-3 [writing-mode:vertical-rl]">
+        <div className="flex basis-full flex-wrap items-stretch gap-2 border-t border-edge pt-2 lg:basis-auto lg:border-t-0 lg:border-l lg:pt-0 lg:pl-2">
+          <span className="basis-full text-sm text-ink-2 lg:basis-auto lg:self-center lg:text-xs lg:text-ink-3 lg:[writing-mode:vertical-rl]">
             {m.backupHeading}
           </span>
           {BACKUP_KNOBS.map(knob)}
@@ -132,7 +137,7 @@ function ModeDialog({
     <dialog
       ref={ref}
       onClose={onClose}
-      className="m-auto max-w-4xl rounded-lg border border-edge bg-chrome p-5 text-ink backdrop:bg-black/60"
+      className="m-auto max-h-[90dvh] w-[calc(100%-1rem)] max-w-4xl overflow-y-auto rounded-lg border border-edge bg-chrome p-4 text-ink backdrop:bg-black/60 sm:p-5"
     >
       <h2 className="text-xl font-semibold">{fmt(m.changeMode, { mode })}</h2>
       <p className="mt-1 mb-4 max-w-prose text-sm text-ink-2">{m.modeDialogHint}</p>
@@ -177,62 +182,77 @@ export function SettingsStrip() {
   const value = draft ?? current;
   const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(current);
 
+  const actions = (cls: string) => (
+    <div className={cls}>
+      {dirty ? (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              send({ type: "applySettings", settings: draft });
+              setDraft(null);
+            }}
+            className="rounded bg-pending px-5 py-2 font-medium text-chrome hover:brightness-110"
+          >
+            {m.confirm}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDraft(null)}
+            className="rounded border border-edge px-4 py-2 text-sm hover:bg-panel lg:py-1.5"
+          >
+            {m.cancel}
+          </button>
+        </>
+      ) : (
+        <Maneuvers />
+      )}
+    </div>
+  );
+
   return (
-    <section aria-label="Ventilator settings" className="border-t border-edge bg-chrome px-4 py-3">
-      <div className="flex flex-wrap items-stretch gap-3">
-        <div
-          role="radiogroup"
-          aria-label="Mode"
-          className="flex flex-col justify-between rounded-md border border-edge bg-panel p-1"
-        >
-          {MODES.map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              role="radio"
-              aria-checked={value.mode === mode}
-              onClick={() => mode !== value.mode && setModeTarget(mode)}
-              className={`rounded px-3 font-readout text-base leading-6 ${
-                value.mode === mode ? "bg-ink text-chrome" : "text-ink-2 hover:bg-panel"
-              }`}
-            >
-              {mode}
-            </button>
-          ))}
+    <section
+      aria-label="Ventilator settings"
+      className="sticky bottom-0 z-20 overflow-x-clip border-t border-edge bg-chrome px-3 py-2 lg:static lg:overflow-x-visible lg:px-4 lg:py-3"
+    >
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch lg:gap-3">
+        {/* Phone: mode + actions on one row. Desktop: these become direct children (lg:contents). */}
+        <div className="flex items-center gap-2 lg:contents">
+          <div
+            role="radiogroup"
+            aria-label="Mode"
+            className="flex rounded-md border border-edge bg-panel p-1 lg:flex-col lg:justify-between"
+          >
+            {MODES.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={value.mode === mode}
+                onClick={() => mode !== value.mode && setModeTarget(mode)}
+                className={`rounded px-3 py-1.5 font-readout text-base leading-6 lg:py-0 ${
+                  value.mode === mode ? "bg-ink text-chrome" : "text-ink-2 hover:bg-panel"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+          {actions("ml-auto flex gap-2 lg:hidden")}
         </div>
 
-        <SettingsEditor
-          value={value}
-          base={current}
-          onChange={(u) => setDraft((d) => u(d ?? current))}
-          showBackup={false}
-        />
-
-        <div className="ml-auto flex flex-col justify-center gap-2">
-          {dirty ? (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  send({ type: "applySettings", settings: draft });
-                  setDraft(null);
-                }}
-                className="rounded bg-pending px-5 py-2 font-medium text-chrome hover:brightness-110"
-              >
-                {m.confirm}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDraft(null)}
-                className="rounded border border-edge px-5 py-1.5 text-sm hover:bg-panel"
-              >
-                {m.cancel}
-              </button>
-            </>
-          ) : (
-            <Maneuvers />
-          )}
+        {/* Phone: knobs scroll sideways in one row. Desktop: they wrap. */}
+        <div className="-mx-3 overflow-x-auto px-3 pb-1 lg:mx-0 lg:overflow-visible lg:px-0 lg:pb-0">
+          <SettingsEditor
+            value={value}
+            base={current}
+            onChange={(u) => setDraft((d) => u(d ?? current))}
+            showBackup={false}
+            layout="strip"
+          />
         </div>
+
+        {actions("hidden lg:ml-auto lg:flex lg:flex-col lg:justify-center lg:gap-2")}
       </div>
       {engine.pendingSettings && (
         <p role="status" className="mt-2 text-sm text-pending">
@@ -259,7 +279,7 @@ function Maneuvers() {
           if (useStore.getState().measuring === type) useStore.setState({ measuring: null });
         }, MANEUVER_TIMEOUT_MS);
       }}
-      className="rounded border border-edge px-4 py-1.5 text-sm hover:bg-panel disabled:opacity-50"
+      className="rounded border border-edge px-3 py-2 text-sm whitespace-nowrap hover:bg-panel disabled:opacity-50 lg:px-4 lg:py-1.5"
     >
       {measuring === type ? m.measuring : label}
     </button>

@@ -4,6 +4,7 @@ import {
   decodeCase,
   diffFromProfile,
   encodeCase,
+  INITIAL_SETTINGS,
   type CaseState,
   type ProfileId,
 } from "@mech-vent/engine";
@@ -14,13 +15,12 @@ import { useStore } from "./store";
 const STORAGE_KEY = "medvent:last-case";
 const SAVE_DELAY_MS = 500;
 
-/** A shared link wins over the remembered session; both fall back to the default profile. */
-function startingCase(): CaseState | null {
+function linkedCase(): CaseState | null {
   const hash = new URLSearchParams(window.location.hash.slice(1)).get("case");
-  if (hash) {
-    const c = decodeCase(hash);
-    if (c) return c;
-  }
+  return hash ? decodeCase(hash) : null;
+}
+
+function savedCase(): CaseState | null {
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     return saved ? decodeCase(saved) : null;
@@ -49,29 +49,55 @@ export function caseLink(c: CaseState): string {
   return `${origin}${pathname}#case=${encodeCase(c)}`;
 }
 
-/** Start the Engine Worker once, connect it to the store, and remember the session. */
+/** True for a case nobody has touched yet: nothing worth remembering. */
+function isUntouchedDefault(c: CaseState, defaultProfile: ProfileId): boolean {
+  return (
+    c.profileId === defaultProfile &&
+    c.sedation === "deep" &&
+    Object.keys(c.patch).length === 0 &&
+    JSON.stringify(c.settings) === JSON.stringify(INITIAL_SETTINGS)
+  );
+}
+
+/** Load a case into the running Engine (used by "Resume last case"). */
+export function loadCase(c: CaseState): void {
+  const { send, setPatientSize } = useStore.getState();
+  setPatientSize(c.sex, c.heightCm);
+  send({ type: "loadProfile", profileId: c.profileId, settings: c.settings });
+  if (c.sedation !== "deep") send({ type: "setSedation", level: c.sedation });
+  if (Object.keys(c.patch).length > 0) send({ type: "setProfileParam", patch: c.patch });
+}
+
+/**
+ * Start the Engine Worker once and connect it to the store. The app opens on the default
+ * profile, or on a shared case link. A remembered session is offered, never forced.
+ */
 export function useEngine(defaultProfile: ProfileId): void {
   useEffect(() => {
     const { receive, setSend, setPatientSize } = useStore.getState();
     const client = new EngineClient(receive);
     setSend((cmd) => client.send(cmd));
 
-    const start = startingCase();
-    if (start) {
-      setPatientSize(start.sex, start.heightCm);
-      client.init(start.profileId, start.settings, start.sedation);
-      if (Object.keys(start.patch).length > 0) {
-        client.send({ type: "setProfileParam", patch: start.patch });
+    const linked = linkedCase();
+    if (linked) {
+      setPatientSize(linked.sex, linked.heightCm);
+      client.init(linked.profileId, linked.settings, linked.sedation);
+      if (Object.keys(linked.patch).length > 0) {
+        client.send({ type: "setProfileParam", patch: linked.patch });
       }
     } else {
       client.init(defaultProfile);
+      const saved = savedCase();
+      if (saved && !isUntouchedDefault(saved, defaultProfile)) {
+        useStore.setState({ resumable: saved });
+      }
     }
 
     // Save shortly after the last change; storage may be unavailable (private mode), which is fine.
     let timer: ReturnType<typeof setTimeout> | undefined;
     const save = () => {
       const c = currentCase();
-      if (!c) return;
+      if (!c || isUntouchedDefault(c, defaultProfile)) return;
       try {
         window.localStorage.setItem(STORAGE_KEY, encodeCase(c));
       } catch {

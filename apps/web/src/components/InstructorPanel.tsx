@@ -163,7 +163,7 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
     <aside
       aria-label={m.instructor}
       onKeyDown={(e) => e.key === "Escape" && onClose()}
-      className="fixed inset-y-0 right-0 z-30 flex w-[360px] flex-col gap-4 overflow-y-auto border-l border-edge bg-chrome p-5 shadow-2xl"
+      className="fixed inset-y-0 right-0 z-30 flex w-full flex-col gap-4 overflow-y-auto border-l border-edge bg-chrome p-4 shadow-2xl sm:w-[360px] sm:p-5"
     >
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{m.instructor}</h2>

@@ -83,6 +83,14 @@ Units: mL/cmH2O · cmH2O/(L/s) · mL/min · mmol/L · breaths/min / cmH2O. Still
 | R4-Q3 | Obstructive R_exp | Asthma 55 → **90**, COPD 50 → **75** (PEEP_i ≈ 9 at RR 16) |
 | R4-Q4 | High pressure limit | Stays at 40. In asthma every breath is cut short (Vte ≈ 260 mL); raising the limit is part of the lesson |
 
+### Round 5 ✅ (2026-10-18, after the V1 release)
+
+| # | Decision | Outcome |
+| --- | --- | --- |
+| R5-1 | Phones (supersedes R3-Q12) | Full controls on every screen size. Top bar shows Instructor on phones. Settings strip is pinned to the bottom with knobs scrolling sideways (44 px touch targets). Instructor panel is full screen on phones. Mode dialog fits the screen |
+| R5-2 | Default patient | The app always opens on **Normal lungs**. A shared case link opens its case. The remembered last case is *offered* ("Resume last case") instead of restored automatically (refines R3-Q11) |
+| R5-3 | AI layer | Not wanted for now. Removed from the active V2 plan |
+
 ### Defaults I'm assuming (not asked, tell me if any are wrong)
 
 - Tooling: `git init` (branch `main`, no remote yet), pnpm workspaces, Node LTS, TypeScript strict, Vitest, ESLint + Prettier
@@ -97,6 +105,12 @@ Units: mL/cmH2O · cmH2O/(L/s) · mL/min · mmol/L · breaths/min / cmH2O. Still
 - [x] You confirmed we understand the design the same way and approved the V1 plan (2026-10-17)
 
 ---
+
+## V1.1: phone support and Normal-lungs default (2026-10-18)
+
+- [x] Responsive top bar, settings strip, Instructor panel, mode dialog; fixed the knob row stretching the phone layout viewport (overflow-x: clip on the strip)
+- [x] Normal lungs by default; "Resume last case" prompt; untouched default sessions are not saved over the remembered case
+- [x] Checked at 390×844 (phone) and 1440×900 (desktop) in a headless browser; redeployed
 
 ## V1 implementation plan
 
@@ -117,4 +131,6 @@ Each milestone ends with its tests passing and an update here.
 
 ### V2 backlog
 
-Scenario Events + Scenario timeline · tension pneumothorax (and circulation response) · LLM layer (Claude: Scenario generation, instructor feedback, debrief) · curved compliance / two compartments · seeded random profile values · accounts and saved Scenarios · Thai localization
+Scenario Events + Scenario timeline · tension pneumothorax (and circulation response) · curved compliance / two compartments · seeded random profile values · accounts and saved Scenarios · Thai localization
+
+_Deferred by you (R5-3): the LLM layer (Scenario generation, instructor feedback, debrief). ADR-0001 still applies if it returns._

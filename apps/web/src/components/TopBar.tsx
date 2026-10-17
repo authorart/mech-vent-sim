@@ -56,8 +56,10 @@ export function TopBar({ onInstructor }: { onInstructor: () => void }) {
   const mode = engine?.apneaBackupActive ? "PCV (backup)" : engine?.settings.mode;
 
   return (
-    <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-edge bg-chrome px-4 py-2">
-      <div className="flex items-baseline gap-3">
+    // Phone: a 2-column grid (identity | Instructor, then alarms, then silence + disclaimer).
+    // Desktop: one flex row, ordered with lg:order-*.
+    <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-edge bg-chrome px-3 py-2 sm:px-4 lg:flex lg:flex-wrap lg:gap-x-6">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5 lg:order-1">
         <span className="font-semibold">MedVent</span>
         {profile && <span className="text-ink-2">{profile.name}</span>}
         {mode && <span className="font-readout text-lg text-ink">{mode}</span>}
@@ -68,7 +70,18 @@ export function TopBar({ onInstructor }: { onInstructor: () => void }) {
         )}
       </div>
 
-      <ul aria-live="assertive" className="flex flex-1 flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={onInstructor}
+        className="rounded bg-panel px-3 py-2 text-sm text-ink hover:bg-edge lg:order-4 lg:py-1.5"
+      >
+        {m.instructor}
+      </button>
+
+      <ul
+        aria-live="assertive"
+        className="col-span-2 flex flex-wrap items-center gap-2 lg:order-2 lg:flex-1"
+      >
         {alarms.length === 0 ? (
           <li className="flex items-center gap-2 text-sm text-ink-3">
             <span aria-hidden className="h-2 w-2 rounded-full bg-ok" />
@@ -81,25 +94,18 @@ export function TopBar({ onInstructor }: { onInstructor: () => void }) {
         )}
       </ul>
 
-      <div className="flex items-center gap-3">
+      <div className="col-span-2 flex flex-wrap items-center gap-2 lg:contents">
         <button
           type="button"
           disabled={alarms.length === 0 && !silenced}
           onClick={() => send({ type: "silenceAlarms" })}
-          className="rounded border border-edge px-3 py-1.5 text-sm text-ink hover:bg-panel disabled:opacity-40"
+          className="rounded border border-edge px-3 py-2 text-sm text-ink hover:bg-panel disabled:opacity-40 lg:order-3 lg:py-1.5"
         >
           {silenced && silencedUntil
             ? fmt(m.silenced, { time: mmss(silencedUntil - now) })
             : m.silence}
         </button>
-        <button
-          type="button"
-          onClick={onInstructor}
-          className="hidden rounded bg-panel px-3 py-1.5 text-sm text-ink hover:bg-edge lg:block"
-        >
-          {m.instructor}
-        </button>
-        <span className="rounded border border-edge px-2 py-1 text-xs text-ink-2">
+        <span className="rounded border border-edge px-2 py-1 text-xs text-ink-2 lg:order-5">
           {m.disclaimer}
         </span>
       </div>

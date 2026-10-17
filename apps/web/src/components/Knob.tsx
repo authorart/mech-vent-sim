@@ -28,7 +28,7 @@ export function Knob({
 
   return (
     <div
-      className={`flex min-w-[92px] flex-col rounded-md border px-2 pt-1.5 pb-1 ${
+      className={`flex min-w-[104px] shrink-0 flex-col rounded-md border px-2 pt-1.5 pb-1 lg:min-w-[92px] ${
         changed ? "border-pending bg-pending/10" : "border-edge bg-panel"
       }`}
     >
@@ -40,7 +40,7 @@ export function Knob({
           type="button"
           aria-label={`Decrease ${spec.label}`}
           onClick={() => step(-1)}
-          className="h-7 w-7 rounded text-lg leading-none text-ink-2 hover:bg-edge"
+          className="h-10 w-10 rounded text-xl leading-none text-ink-2 hover:bg-edge lg:h-7 lg:w-7 lg:text-lg"
         >
           −
         </button>
@@ -70,7 +70,7 @@ export function Knob({
           type="button"
           aria-label={`Increase ${spec.label}`}
           onClick={() => step(1)}
-          className="h-7 w-7 rounded text-lg leading-none text-ink-2 hover:bg-edge"
+          className="h-10 w-10 rounded text-xl leading-none text-ink-2 hover:bg-edge lg:h-7 lg:w-7 lg:text-lg"
         >
           +
         </button>
@@ -96,7 +96,7 @@ export function Toggle<T extends string>({
 }) {
   return (
     <fieldset
-      className={`flex min-w-[92px] flex-col rounded-md border px-2 pt-1.5 pb-1.5 ${
+      className={`flex min-w-[92px] shrink-0 flex-col rounded-md border px-2 pt-1.5 pb-1.5 ${
         changed ? "border-pending bg-pending/10" : "border-edge bg-panel"
       }`}
     >
@@ -111,7 +111,7 @@ export function Toggle<T extends string>({
             type="button"
             aria-pressed={value === o.value}
             onClick={() => onChange(o.value)}
-            className={`flex-1 rounded px-1.5 py-1 text-sm ${
+            className={`flex-1 rounded px-1.5 py-2 text-sm lg:py-1 ${
               value === o.value ? "bg-edge text-ink" : "text-ink-3 hover:text-ink-2"
             }`}
           >

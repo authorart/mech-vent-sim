@@ -5,6 +5,7 @@ import {
   type AlarmState,
   type BloodGas,
   type BreathMetrics,
+  type CaseState,
   type EngineCommand,
   type EngineEvent,
   type EngineMessage,
@@ -35,6 +36,8 @@ interface Store {
   /** UI-only patient demographics, for PBW. */
   sex: Sex;
   heightCm: number;
+  /** The remembered last case, offered on open (null once resumed or dismissed). */
+  resumable: CaseState | null;
 
   send: (cmd: EngineCommand) => void;
   setSend: (send: (cmd: EngineCommand) => void) => void;
@@ -59,6 +62,7 @@ export const useStore = create<Store>((set, get) => ({
   lastEvent: null,
   sex: "male",
   heightCm: 170,
+  resumable: null,
 
   send: () => {},
   setSend: (send) => set({ send }),

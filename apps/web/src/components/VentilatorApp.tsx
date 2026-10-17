@@ -5,6 +5,7 @@ import { useEngine } from "@/engine/useEngine";
 import { useStore } from "@/engine/store";
 import { fmt, messages as m } from "@/i18n";
 import { InstructorPanel } from "./InstructorPanel";
+import { ResumePrompt } from "./ResumePrompt";
 import { Loops } from "./Loops";
 import { GasPanel, Numerics } from "./Numerics";
 import { SettingsStrip } from "./SettingsStrip";
@@ -12,7 +13,7 @@ import { TopBar } from "./TopBar";
 import { Waveforms } from "./Waveforms";
 
 export function VentilatorApp() {
-  useEngine("ards");
+  useEngine("normal");
   const connection = useStore((s) => s.connection);
   const error = useStore((s) => s.error);
   const backup = useStore((s) => s.engine?.apneaBackupActive);
@@ -30,16 +31,17 @@ export function VentilatorApp() {
           {fmt(m.engineError, { message: error ?? "" })}
         </p>
       )}
+      <ResumePrompt />
       {backup && (
         <p role="status" className="bg-panel px-4 py-1.5 text-sm text-ink">
           {m.apneaBackupActive}
         </p>
       )}
 
-      <main className="grid flex-1 grid-cols-1 gap-4 p-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <main className="grid flex-1 grid-cols-1 gap-3 p-3 sm:gap-4 sm:p-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section
           aria-label="Waveforms"
-          className="flex min-h-[380px] flex-col rounded-lg bg-glass p-3"
+          className="flex min-h-[340px] flex-col rounded-lg bg-glass p-2 sm:min-h-[380px] sm:p-3"
         >
           <div className="mb-2 flex items-center gap-2">
             <div role="tablist" aria-label="Display" className="flex gap-1">
@@ -99,12 +101,7 @@ export function VentilatorApp() {
         </aside>
       </main>
 
-      <div className="hidden lg:block">
-        <SettingsStrip />
-      </div>
-      <p className="px-4 pb-4 text-sm text-ink-3 lg:hidden">
-        Controls need a screen at least 1024 px wide. This view shows waveforms and values only.
-      </p>
+      <SettingsStrip />
 
       <InstructorPanel open={instructor} onClose={() => setInstructor(false)} />
     </div>

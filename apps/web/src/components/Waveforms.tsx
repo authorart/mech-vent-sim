@@ -223,7 +223,7 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
   return (
     <div
       ref={wrapRef}
-      className="relative h-full min-h-[360px] w-full select-none"
+      className="relative h-full min-h-[300px] w-full touch-pan-y select-none sm:min-h-[360px]"
       onPointerMove={(e) => {
         const r = e.currentTarget.getBoundingClientRect();
         setCursor({ x: e.clientX - r.left, y: e.clientY - r.top });
