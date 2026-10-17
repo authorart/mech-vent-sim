@@ -1,6 +1,3 @@
-/** Engine contract version. Bump whenever the Engine ↔ UI message shapes change. */
-export const ENGINE_CONTRACT_VERSION = 1;
-
 export * from "./types";
 export { LinearLung, type LungModel } from "./lung";
 export { PatientEffort } from "./effort";
@@ -65,3 +62,11 @@ export {
   effectiveDrive,
   type SedationLevel,
 } from "./drive";
+export {
+  ENGINE_CONTRACT_VERSION,
+  type EngineCommand,
+  type EngineMessage,
+  type EngineState,
+  type ProfilePatch,
+} from "./protocol";
+export { EngineHost, MAX_TICK, type Post } from "./host";
