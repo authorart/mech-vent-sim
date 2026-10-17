@@ -1,29 +1,62 @@
 import { AlarmEngine, type AlarmEvent, type AlarmLimits } from "./alarms";
+import { GasExchange, type BloodGas, type GasInputs, type GasParams } from "./gas";
 import { Monitor, type BreathMetrics } from "./monitor";
 import { Simulator, type SimulatorOptions } from "./simulator";
-import type { EngineEvent } from "./types";
+import type { BreathRecord, EngineEvent } from "./types";
+import { Circulation, type CirculationParams, type Vitals } from "./vitals";
 
 export interface SessionStep {
   samples: Float32Array;
   metrics: BreathMetrics[];
   events: EngineEvent[];
   alarms: AlarmEvent[];
+  /** Blood gas and vital signs, reported once per simulated second (after priming). */
+  physiology: { t: number; gas: BloodGas; vitals: Vitals } | null;
 }
 
 export interface SessionOptions extends SimulatorOptions {
   alarmLimits?: AlarmLimits;
+  gas?: GasParams;
+  circulation?: CirculationParams;
 }
 
-/** Simulator + Monitor + AlarmEngine, stepped together. */
+/** Healthy adult gas exchange, used when a Session is created without profile values. */
+export const NORMAL_GAS: GasParams = {
+  vco2: 200,
+  anatomicDeadSpace: 0.125,
+  alveolarDeadSpaceFraction: 0.067,
+  shuntMax: 0.05,
+  recruitableFraction: 0,
+  peepHalf: 10,
+  vqMismatch: 0.02,
+  hco3: 24,
+  hb: 12,
+};
+
+export const NORMAL_CIRCULATION: CirculationParams = { hr: 80, sbp: 120, dbp: 75 };
+
+/** Gas and vitals start reporting once this much time has passed, already at steady state. */
+export const PHYSIOLOGY_PRIME_TIME = 10;
+
+/** Simulator + Monitor + AlarmEngine + gas exchange + circulation, stepped together. */
 export class Session {
   readonly sim: Simulator;
   readonly monitor = new Monitor();
   readonly alarms: AlarmEngine;
+  readonly gas: GasExchange;
+  readonly circulation: Circulation;
+  /** Physiological time runs this many times faster than the waveforms (fast-forward). */
+  gasTimeScale = 1;
+
   private latest: BreathMetrics | null = null;
+  private latestRecord: BreathRecord | null = null;
+  private lastReport = 0;
 
   constructor(opts: SessionOptions) {
     this.sim = new Simulator(opts);
     this.alarms = new AlarmEngine(opts.alarmLimits);
+    this.gas = new GasExchange({ ...(opts.gas ?? NORMAL_GAS) });
+    this.circulation = new Circulation({ ...(opts.circulation ?? NORMAL_CIRCULATION) });
   }
 
   get latestMetrics(): BreathMetrics | null {
@@ -36,7 +69,7 @@ export class Session {
     const metrics: BreathMetrics[] = [];
 
     // Breaths and events are processed in time order so alarms rise and clear in order.
-    type Item = { t: number; breath?: (typeof r.breaths)[number]; event?: EngineEvent };
+    type Item = { t: number; breath?: BreathRecord; event?: EngineEvent };
     const items: Item[] = [
       ...r.breaths.map((b) => ({ t: b.endTime, breath: b })),
       ...r.events.map((e) => ({ t: e.t, event: e })),
@@ -47,6 +80,8 @@ export class Session {
         const m = this.monitor.update(it.breath);
         metrics.push(m);
         this.latest = m;
+        this.latestRecord = it.breath;
+        this.gas.onBreath(it.breath);
         alarms.push(
           ...this.alarms.onBreath(
             m,
@@ -59,6 +94,46 @@ export class Session {
         alarms.push(...this.alarms.onEvent(it.event));
       }
     }
-    return { samples: r.samples, metrics, events: r.events, alarms };
+
+    return {
+      samples: r.samples,
+      metrics,
+      events: r.events,
+      alarms,
+      physiology: this.stepPhysiology(seconds),
+    };
+  }
+
+  private stepPhysiology(seconds: number): SessionStep["physiology"] {
+    const t = this.sim.time;
+    const inputs = this.gasInputs();
+    const vitalsInputs = () => ({
+      pmean: this.latest?.pmean ?? this.sim.currentSettings.peep,
+      peepI: this.latest?.truth.peepI ?? 0,
+      spo2: this.gas.state?.spo2 ?? 97,
+    });
+
+    if (!this.gas.primed) {
+      if (t < PHYSIOLOGY_PRIME_TIME) return null;
+      this.gas.prime(t, inputs);
+      this.circulation.prime(vitalsInputs());
+    } else {
+      const dt = seconds * this.gasTimeScale;
+      this.gas.step(t, dt, inputs);
+      this.circulation.step(dt, vitalsInputs());
+    }
+
+    if (t - this.lastReport < 1 - 1e-9) return null;
+    this.lastReport = Math.floor(t);
+    const gas = this.gas.state;
+    const vitals = this.circulation.state;
+    return gas && vitals ? { t, gas, vitals } : null;
+  }
+
+  private gasInputs(): GasInputs {
+    return {
+      fio2: this.sim.currentSettings.fio2,
+      endExpAlveolarPressure: this.latestRecord?.endExpRecoil ?? this.sim.currentSettings.peep,
+    };
   }
 }

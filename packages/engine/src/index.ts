@@ -27,4 +27,20 @@ export {
   type AlarmPriority,
   type AlarmState,
 } from "./alarms";
-export { Session, type SessionOptions, type SessionStep } from "./session";
+export {
+  Session,
+  NORMAL_GAS,
+  NORMAL_CIRCULATION,
+  PHYSIOLOGY_PRIME_TIME,
+  type SessionOptions,
+  type SessionStep,
+} from "./session";
+export {
+  GasExchange,
+  o2Saturation,
+  o2Content,
+  type BloodGas,
+  type GasInputs,
+  type GasParams,
+} from "./gas";
+export { Circulation, type CirculationParams, type Vitals, type VitalsInputs } from "./vitals";
