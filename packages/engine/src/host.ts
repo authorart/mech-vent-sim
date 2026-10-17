@@ -40,13 +40,12 @@ export class EngineHost {
     if (!s || this.paused || realSeconds <= 0) return;
     const step = s.advance(Math.min(realSeconds, MAX_TICK));
 
+    // Events first, so the UI knows breath-start times before it draws the samples.
+    for (const e of step.events) this.post({ type: "event", event: e });
     if (step.samples.length > 0) {
       this.post({ type: "samples", data: step.samples }, [step.samples.buffer as ArrayBuffer]);
     }
     for (const m of step.metrics) this.post({ type: "breath", metrics: m });
-    for (const e of step.events) {
-      if (e.type !== "breathStart") this.post({ type: "event", event: e });
-    }
     if (step.physiology) this.post({ type: "physiology", ...step.physiology });
 
     const silenced = s.alarms.isSilenced(s.sim.time);

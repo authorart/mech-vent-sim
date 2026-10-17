@@ -1,0 +1,77 @@
+/** English strings. Other locales copy this shape (R1-Q9: English now, more languages later). */
+export const en = {
+  disclaimer: "Education only. Not for clinical use.",
+  connecting: "Starting the simulator…",
+  engineError: "The simulator stopped: {message}",
+
+  noAlarms: "No alarms",
+  silence: "Silence 2 min",
+  silenced: "Silenced {time}",
+  alarm: {
+    HIGH_PRESSURE: "High airway pressure",
+    APNEA: "Apnea: backup ventilation",
+    LOW_MINUTE_VENT: "Low minute ventilation",
+    DISCONNECT: "Circuit disconnect",
+    AUTO_PEEP: "Auto-PEEP > {limit} cmH₂O",
+    HIGH_DRIVING_PRESSURE: "Driving pressure > {limit} cmH₂O",
+    LOW_VTE: "Low exhaled Vt",
+    HIGH_VTE: "High exhaled Vt",
+    HIGH_MINUTE_VENT: "High minute ventilation",
+    HIGH_RATE: "High respiratory rate",
+  },
+  priority: { high: "High priority", medium: "Medium priority" },
+
+  trace: { pressure: "Paw", flow: "Flow", volume: "Volume" },
+  waveforms: "Waveforms",
+  loops: "Loops",
+  pvLoop: "Pressure–volume",
+  fvLoop: "Flow–volume",
+  freeze: "Freeze",
+  unfreeze: "Unfreeze",
+  frozenHint: "Frozen. Move over the traces to read values.",
+
+  inspiratoryPause: "Insp. pause",
+  expiratoryHold: "Exp. hold",
+  measuring: "Measuring…",
+  unreliable: "Patient effort during the maneuver. Value is unreliable.",
+  notMeasured: "Use Insp. pause",
+  notMeasuredHold: "Use Exp. hold",
+
+  confirm: "Confirm",
+  cancel: "Cancel",
+  pendingNextBreath: "New settings apply at the next breath",
+  changeMode: "Change mode to {mode}",
+  modeDialogHint:
+    "PEEP, FiO₂, trigger and pressure limit carry over. Check the rest before confirming.",
+  confirmMode: "Switch to {mode}",
+  backupHeading: "Apnea backup (PCV)",
+
+  instructor: "Instructor",
+  closeInstructor: "Close instructor panel",
+  profile: "Patient profile",
+  loadProfile: "Load profile",
+  loadProfileHint:
+    "Loading a profile restarts the patient on the Initial Settings, deeply sedated.",
+  sedation: "Sedation",
+  sedationLevel: { deep: "Deep", light: "Light", awake: "Awake" },
+  patient: "Patient",
+  sex: { male: "Male", female: "Female" },
+  height: "Height",
+  pbw: "PBW",
+  mechanics: "Mechanics",
+  gasExchange: "Gas exchange",
+  drive: "Respiratory drive",
+  simulation: "Simulation",
+  pause: "Pause patient",
+  resume: "Resume patient",
+  fastForward: "Blood-gas speed",
+  endBackup: "End apnea backup",
+  reset: "Restart on Initial Settings",
+  apneaBackupActive: "Apnea backup is ventilating the patient",
+
+  bloodGas: "Blood gas",
+  vitals: "Vitals",
+  waitingGas: "Blood gas available after 10 s",
+} as const;
+
+export type Messages = typeof en;

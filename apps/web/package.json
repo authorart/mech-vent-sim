@@ -10,10 +10,11 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@mech-vent/engine": "workspace:*",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "@mech-vent/engine": "workspace:*"
+    "zustand": "^5"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

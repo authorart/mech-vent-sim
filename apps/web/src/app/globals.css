@@ -1,26 +1,71 @@
 @import "tailwindcss";
 
+/*
+ * Monitor-glass palette. Trace colors were checked with the dataviz validator
+ * (dark band, CVD, contrast) against --glass. Alarm colors are reserved for alarms.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --chrome: #0a141d;
+  --panel: #13212d;
+  --glass: #0f1b26;
+  --grid: #1f3343;
+  --edge: #2a4356;
+  --ink: #e6eef4;
+  --ink-2: #a3b5c3;
+  --ink-3: #6f8597;
+  --trace-pressure: #c08a1e;
+  --trace-flow: #18977e;
+  --trace-volume: #6c7cf0;
+  --pending: #4db8e8;
+  --alarm-high: #e5484d;
+  --alarm-medium: #f5d90a;
+  --ok: #3fb27f;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-chrome: var(--chrome);
+  --color-panel: var(--panel);
+  --color-glass: var(--glass);
+  --color-grid: var(--grid);
+  --color-edge: var(--edge);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-pressure: var(--trace-pressure);
+  --color-flow: var(--trace-flow);
+  --color-volume: var(--trace-volume);
+  --color-pending: var(--pending);
+  --color-alarm-high: var(--alarm-high);
+  --color-alarm-medium: var(--alarm-medium);
+  --color-ok: var(--ok);
+  --font-sans: var(--font-barlow);
+  --font-readout: var(--font-barlow-condensed);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--chrome);
+  color: var(--ink);
+  font-family: var(--font-barlow), system-ui, sans-serif;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--pending);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
