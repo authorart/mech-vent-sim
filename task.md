@@ -248,6 +248,8 @@ _M16 notes:_ breath type is on every BreathRecord and `breathStart` event; the c
 
 _After M16 (2026-10-18):_ fixed top bar (alarms on their own row) and a two-row settings bar · Instructor sections show/hide with Show all / Hide all · seconds scale under the live and guide waveforms · premature cycling example rebuilt from the references (Gentile 2011; Hamilton asynchrony card): ARDS on PSV 15 with Esens 50%, giving a cut, doubled expiratory peak, with esophageal pressure shown; tested against Esens 5%. 169 engine tests.
 
+_High drive fix (2026-10-18):_ chemoreflex inertia (τ up 20 s, down 90 s) so a high-drive patient doesn't calm within seconds · metabolic acidosis's wakefulness floor is a normal drive, so correcting HCO₃⁻ resolves its asynchrony while untreated it persists (premature cycling, double triggering) · disconnect alarm needs 3 breaths (no false alarm from stacked breaths) · premature cycling example is now metabolic acidosis on PSV with a zoomed flow axis showing the expiratory bump. 177 engine tests.
+
 ### Later (not in V2)
 
 Adaptive modes (PRVC/volume support) · PSV periodic breathing with sleep · two-compartment lung · seeded random profile values · accounts and saved Scenarios · Thai localization

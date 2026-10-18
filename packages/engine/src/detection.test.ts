@@ -34,7 +34,9 @@ const pcv = (o: Partial<PcvSettings>): PcvSettings => ({
 
 describe("Synchronous patients aren't labeled", () => {
   it.each([
-    ["normal lungs on PSV, awake", "normal", psv({}), "awake"],
+    // Lightly sedated: an awake patient's inspiration (~1.7 s) outlasts a pressure-support breath
+    // in normal lungs, which is real premature cycling, not a false label.
+    ["normal lungs on PSV, light sedation", "normal", psv({}), "light"],
     ["normal lungs on VCV, sedated", "normal", INITIAL_SETTINGS, "deep"],
     ["ARDS on VCV, sedated", "ards", INITIAL_SETTINGS, "deep"],
   ] as const)("%s", (_, id, settings, sedation) => {

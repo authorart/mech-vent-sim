@@ -55,7 +55,20 @@ export const SEDATION_FACTOR: Record<SedationLevel, number> = { deep: 0, light: 
  * Wakefulness drive (V1.2, Hess & Kacmarek ch. 7/15): an awake patient keeps breathing even when
  * alkalemic; only the chemical part of drive falls to zero. The multiplier never drops below this.
  */
-export const WAKEFULNESS_FLOOR: Record<SedationLevel, number> = { deep: 0, light: 0.15, awake: 0.4 };
+export const WAKEFULNESS_FLOOR: Record<SedationLevel, number> = {
+  deep: 0,
+  light: 0.15,
+  awake: 0.4,
+};
+
+/**
+ * Chemoreflex inertia (s): drive rises toward its pH target within about 20 s (peripheral
+ * chemoreceptors) and settles back over about 90 s (central chemoreceptors, and the slow decay
+ * of ventilation after a stimulus). Without it a high-drive patient's breathing would collapse
+ * within seconds of the first big breaths.
+ */
+export const CHEMO_RISE_TIME = 20;
+export const CHEMO_FALL_TIME = 90;
 
 /** Arterial pH at or above which chemical drive stops (apneic threshold). */
 export const APNEIC_PH = 7.5;
@@ -72,23 +85,38 @@ export function chemoreflexMultiplier(ph: number | null, referencePh: number): n
   return Math.min(MAX_MULTIPLIER, Math.max(0, m));
 }
 
-/** The drive actually applied to the patient, given sedation, chemoreflex and agitation. */
+/** The part of a drive that sedation, chemoreflex and agitation scale. */
+export type DriveLevel = Pick<Drive, "neuralRate" | "pmusMax">;
+
+/**
+ * The drive actually applied to the patient, given sedation, chemoreflex and agitation.
+ * `wakefulnessBase` is the drive the wakefulness floor scales from: by default the profile's own,
+ * because part of a sick patient's drive is not chemical (stiff, inflamed lungs). When a disease's
+ * extra drive is purely chemical (metabolic acidosis) it is normal breathing, so correcting the
+ * acidosis brings the patient back to a normal awake drive.
+ */
 export function effectiveDrive(
   base: Drive,
   sedation: SedationLevel,
   chemo: number,
   agitation: Agitation = "none",
+  wakefulnessBase: DriveLevel = base,
 ): Drive {
   const s = SEDATION_FACTOR[sedation];
   const a = AGITATION_EFFECT[agitation];
   const floor = WAKEFULNESS_FLOOR[sedation] + (WAKEFULNESS_FLOOR[sedation] > 0 ? a.floor : 0);
-  const multiplier = Math.max(chemo, floor);
-  if (s === 0 || multiplier === 0 || base.neuralRate === 0) {
+  const scaled = (d: DriveLevel, m: number) =>
+    m > 0 ? { pmusMax: d.pmusMax * m, neuralRate: d.neuralRate * (0.5 + 0.5 * m) } : null;
+  const chemical = scaled(base, chemo);
+  const awake = scaled(wakefulnessBase, floor);
+  if (s === 0 || base.neuralRate === 0 || (!chemical && !awake)) {
     return { ...base, neuralRate: 0, pmusMax: 0 };
   }
+  const pmus = Math.max(chemical?.pmusMax ?? 0, awake?.pmusMax ?? 0);
+  const rate = Math.max(chemical?.neuralRate ?? 0, awake?.neuralRate ?? 0);
   return {
     ...base,
-    pmusMax: base.pmusMax * s * multiplier * a.pmus,
-    neuralRate: Math.min(MAX_NEURAL_RATE, base.neuralRate * (0.5 + 0.5 * multiplier) * a.rate),
+    pmusMax: pmus * s * a.pmus,
+    neuralRate: Math.min(MAX_NEURAL_RATE, rate * a.rate),
   };
 }

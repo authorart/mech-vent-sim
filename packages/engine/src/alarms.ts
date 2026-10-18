@@ -64,6 +64,11 @@ export const DEFAULT_ALARM_LIMITS: AlarmLimits = {
 export const SILENCE_TIME = 120;
 /** Volume and rate alarms wait for this many breaths so the rolling window can fill. */
 const WARMUP_BREATHS = 3;
+/**
+ * Circuit disconnect needs the volume lost over this many breaths together: one breath with
+ * little exhaled volume is normal when breaths stack (double triggering), a disconnect is not.
+ */
+const DISCONNECT_BREATHS = 3;
 
 export interface AlarmState {
   id: AlarmId;
@@ -80,6 +85,7 @@ export class AlarmEngine {
   private active = new Map<AlarmId, AlarmState>();
   private silencedUntil = -Infinity;
   private breathCount = 0;
+  private recentVolumes: { vti: number; vte: number }[] = [];
 
   constructor(public limits: AlarmLimits = { ...DEFAULT_ALARM_LIMITS }) {}
 
@@ -91,6 +97,11 @@ export class AlarmEngine {
     apneaBackupActive: boolean,
   ): AlarmEvent[] {
     this.breathCount++;
+    this.recentVolumes = [...this.recentVolumes, { vti: metrics.vti, vte: metrics.vte }].slice(
+      -DISCONNECT_BREATHS,
+    );
+    const vti = this.recentVolumes.reduce((s, v) => s + v.vti, 0);
+    const vte = this.recentVolumes.reduce((s, v) => s + v.vte, 0);
     const l = this.limits;
     const warm = this.breathCount >= WARMUP_BREATHS;
     const conditions: Partial<Record<AlarmId, boolean>> = {
@@ -100,7 +111,8 @@ export class AlarmEngine {
       HIGH_DRIVING_PRESSURE: metrics.truth.drivingPressure > l.drivingPressure,
       LOW_VTE: metrics.vte < l.lowVte,
       HIGH_VTE: metrics.vte > l.highVte,
-      DISCONNECT: metrics.vti > 0.05 && metrics.vte < 0.2 * metrics.vti,
+      DISCONNECT:
+        this.recentVolumes.length === DISCONNECT_BREATHS && metrics.vti > 0.05 && vte < 0.2 * vti,
       LOW_MINUTE_VENT: warm && metrics.ve < l.lowMinuteVent,
       HIGH_MINUTE_VENT: warm && metrics.ve > l.highMinuteVent,
       HIGH_RATE: warm && metrics.rrTotal > l.highRate,

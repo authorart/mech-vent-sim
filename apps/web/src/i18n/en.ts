@@ -17,6 +17,7 @@ export const en = {
     "Example from the simulator, {seconds} seconds. Markers show what was detected; this card's type is in bold.",
   exampleEffort:
     "Example from the simulator, {seconds} seconds. Bold: mandatory breaths. Bottom row: esophageal pressure, which dips with each patient effort.",
+  flowZoomed: "zoomed (inspiratory peaks run off the top)",
   examplePes: "Bottom row: esophageal pressure, which dips while the patient breathes in.",
   mandatoryShort: "Mandatory",
   spontaneousShort: "Spont.",

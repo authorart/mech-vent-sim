@@ -28,6 +28,16 @@ export interface Example {
   showPes?: boolean;
   /** Seconds shown (default 8). */
   seconds?: number;
+  /**
+   * Run this long first, in short steps so the patient's drive follows the blood gas as in the
+   * simulator (default: 40 s in one step). For high-drive patients, to show their steady state.
+   */
+  settle?: number;
+  /**
+   * Zoom the example's flow axis to ±this (L/min), letting inspiratory peaks run off the top, to
+   * look at expiration as a clinician zooms the ventilator screen.
+   */
+  flowZoom?: number;
 }
 
 /** The classified asynchronies, plus mode asynchrony (SIMV), which is a pattern, not a breath. */
@@ -229,30 +239,33 @@ export const GUIDE: GuideEntry[] = [
     family: "Cycle",
     summary: "The ventilator ends inspiration while the patient is still breathing in.",
     recognize: [
-      "Expiratory flow: the first expiratory peak is cut short, then flow is pulled back toward zero while the patient keeps breathing in, and a second, later peak follows when the effort ends: a cut, delayed or 'doubled' expiratory peak.",
+      "Expiratory flow: just after the expiratory peak, a bump or notch where the flow is pulled back toward zero (the patient is still breathing in), then expiration resumes. The peak can look cut, delayed or 'doubled'.",
       "The breath is short: inspiration ends early in the patient's effort. On esophageal pressure the patient's dip carries on into expiration.",
-      "Often followed by a double trigger, when the effort pulls the flow past the trigger.",
+      "When the effort is strong enough to pull the flow past the trigger, a second breath follows at once: double triggering.",
+      "It keeps happening breath after breath until its cause is treated.",
     ],
     why: [
-      "In PSV with stiff lungs (ARDS, low compliance): inspiratory flow falls to Esens within a fraction of a second, long before the patient has finished breathing in. A high Esens or a fast rise makes it worse.",
+      "A high drive (severe metabolic acidosis, hypoxemia, pain): the patient wants a longer, bigger breath than the ventilator gives, and keeps pulling after the breath ends.",
+      "In PSV: flow falls to Esens quickly, long before the patient has finished breathing in, more so with stiff lungs (ARDS), a high Esens or a fast rise.",
       "Inspiratory time set shorter than the patient's own (VCV with high flow and small Vt, short PCV Ti).",
-      "A high drive: the patient wants a longer, bigger breath than the ventilator gives.",
     ],
     fix: [
+      "Treat what drives the patient: in metabolic acidosis, the cause and the bicarbonate. Asynchrony from a high drive does not go away until the drive comes down.",
       "PSV: lower Esens (about 5–10% in stiff lungs) and use a slower rise, so the breath lasts longer.",
-      "VCV: lower the flow or use a decelerating ramp; PCV: lengthen Ti to match the patient.",
-      "Treat the high drive (hypoxemia, acidosis, pain, anxiety).",
+      "VCV: a bigger Vt (up to 8 mL/kg PBW) with a lower flow or a decelerating ramp; PCV: lengthen Ti to match the patient.",
     ],
     source:
       "Ch. 15 (fig. 15-8), ch. 9; Gentile MA, Respir Care 2011;56:52 (cycling); Hamilton Medical asynchrony reference card",
     example: {
-      profileId: "ards",
-      settings: psv({ pSupport: 15, esens: 0.5 }),
+      profileId: "metabolicAcidosis",
+      settings: psv({ pSupport: 18, esens: 0.5 }),
       sedation: "awake",
       features: features(),
       showPes: true,
+      settle: 180,
+      flowZoom: 90,
       watch:
-        "ARDS on PSV 15 with Esens 50%: each breath ends after about a quarter of a second while the patient is still breathing in. Expiratory flow dips, is pulled back to about zero, then dips again when the effort stops (two expiratory peaks). Lower Esens to 5% and expiration becomes one smooth curve, with bigger breaths.",
+        "Severe metabolic acidosis on PSV 18 with Esens 50%, once settled: each breath ends while the patient's effort (bottom row) is still building, so just after the expiratory peak the flow bumps back toward zero, then expiration resumes. It goes on breath after breath. Lower Esens to 10% to lengthen the breath; raising HCO₃⁻ in the Instructor Panel (gas exchange) treats the drive itself.",
     },
   },
   {

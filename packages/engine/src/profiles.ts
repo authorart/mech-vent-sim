@@ -1,4 +1,4 @@
-import type { SedationLevel } from "./drive";
+import type { DriveLevel, SedationLevel } from "./drive";
 import type { GasParams } from "./gas";
 import type { Mechanics, Patient } from "./types";
 import type { CirculationParams } from "./vitals";
@@ -27,6 +27,8 @@ export interface PatientProfile {
   recommendedVtPerKg: number;
   /** Arterial pH at which the profile's drive applies unchanged (chemoreflex reference). */
   referencePh: number;
+  /** The drive the wakefulness floor scales from, when not the profile's own (see effectiveDrive). */
+  wakefulnessDrive?: DriveLevel;
   startSedation: SedationLevel;
 }
 
@@ -60,6 +62,8 @@ export interface ProfileValues {
   overdistensionStiffness?: number;
   /** Sedation level the profile opens with (default deep, R4-Q1). */
   startSedation?: SedationLevel;
+  /** Wakefulness floor drive (neural rate /min, P_mus cmH2O) when the disease's drive is purely chemical. */
+  wakefulnessDrive?: DriveLevel;
   /** Blood pressure's dependence on venous return (see CirculationParams). Default 1. */
   preloadSensitivity?: number;
   /** Further lung mechanics (M11): flow limitation, recruitment, viscoelasticity, chest wall. */
@@ -86,13 +90,17 @@ export function buildProfile(
     summary,
     recommendedVtPerKg,
     referencePh: v.referencePh,
+    ...(v.wakefulnessDrive && { wakefulnessDrive: v.wakefulnessDrive }),
     startSedation: v.startSedation ?? "deep",
     patient: {
       mechanics: {
         compliance: v.compliance / 1000,
         rInsp: v.rInsp,
         rExp: v.rExp,
-        ...(v.airwayCollapse && { airwayCollapse: v.airwayCollapse, collapseVolume: v.collapseVolume }),
+        ...(v.airwayCollapse && {
+          airwayCollapse: v.airwayCollapse,
+          collapseVolume: v.collapseVolume,
+        }),
         ...(v.overdistensionStiffness && {
           overdistensionVolume: v.overdistensionVolume,
           overdistensionStiffness: v.overdistensionStiffness,
@@ -269,6 +277,8 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       lung: { viscoResistance: 3, viscoTime: 1, chestWallCompliance: 0.2, pesOffset: 3 },
       preloadSensitivity: 1.3,
       referencePh: 7.1,
+      // The intense drive is all chemical: with the acidosis corrected, normal awake breathing.
+      wakefulnessDrive: { neuralRate: 14, pmusMax: 5 },
     },
   ),
   cardiogenicEdema: buildProfile(

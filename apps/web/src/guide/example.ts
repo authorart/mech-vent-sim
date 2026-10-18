@@ -17,6 +17,8 @@ export interface ExampleTrace {
   breaths: { t: number; type: BreathType }[];
   /** Label breaths by type instead of marking asynchronies. */
   labelBreaths: boolean;
+  /** Fixed flow axis (±L/min) with peaks clipped, or null to fit the trace. */
+  flowZoom: number | null;
   /**
    * For comparison examples: the airway pressure of the same breath with no patient effort,
    * drawn from each breath's start (Hess & Kacmarek fig. 15-6, the dashed line).
@@ -26,6 +28,8 @@ export interface ExampleTrace {
 
 const SETTLE = 40;
 const SHOWN = 8;
+/** Step for examples that settle like the simulator (s). */
+const SETTLE_STEP = 0.5;
 /** Effort examples (SIMV): start just before a cycle so the stretch opens on a Mandatory Breath. */
 const EFFORT_SETTLE = 39.5;
 
@@ -68,8 +72,13 @@ export function runExample(ex: Example): ExampleTrace {
     noiseSeed: null,
     features: { ...ex.features, breathing: "regular" },
   });
-  const settle = ex.showEffort ? EFFORT_SETTLE : SETTLE;
-  s.advance(settle);
+  const settle = ex.settle ?? (ex.showEffort ? EFFORT_SETTLE : SETTLE);
+  if (ex.settle) {
+    // Short steps, as in the simulator, so the drive follows the blood gas.
+    for (let done = 0; done < ex.settle - 1e-9; done += SETTLE_STEP) s.advance(SETTLE_STEP);
+  } else {
+    s.advance(settle);
+  }
   const step = s.advance(ex.seconds ?? SHOWN);
   const out: ExampleTrace = {
     t: [],
@@ -79,6 +88,7 @@ export function runExample(ex: Example): ExampleTrace {
     marks: [],
     breaths: [],
     labelBreaths: ex.showEffort === true,
+    flowZoom: ex.flowZoom ?? null,
     passive: [],
   };
   const d = step.samples;

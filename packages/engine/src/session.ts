@@ -1,9 +1,12 @@
 import {
   AGITATION_EFFECT,
   CARDIAC_OSCILLATION,
+  CHEMO_FALL_TIME,
+  CHEMO_RISE_TIME,
   chemoreflexMultiplier,
   DEFAULT_FEATURES,
   effectiveDrive,
+  type DriveLevel,
   type PatientFeatures,
   type SedationLevel,
 } from "./drive";
@@ -36,6 +39,8 @@ export interface SessionOptions extends SimulatorOptions {
   sedation?: SedationLevel;
   /** Chemoreflex reference pH (default 7.40). */
   referencePh?: number;
+  /** Drive the wakefulness floor scales from (default: the patient's own drive). */
+  wakefulnessDrive?: DriveLevel;
   /** How the patient breathes (default: natural, no agitation, no reverse triggering). */
   features?: PatientFeatures;
   /** Seed for the breathing variability (default 1), so a case replays the same breaths. */
@@ -97,11 +102,16 @@ export class Session {
   private latest: BreathMetrics | null = null;
   private latestRecord: BreathRecord | null = null;
   private lastReport = 0;
+  private wakefulnessDrive: DriveLevel | null;
+  /** Chemoreflex multiplier, following its pH target with inertia (see CHEMO_RISE_TIME). */
+  private chemo = 1;
+  private chemoTime = 0;
 
   constructor(opts: SessionOptions) {
     this.baseDrive = { ...opts.patient.drive };
     this.sedation = opts.sedation ?? "deep";
     this.referencePh = opts.referencePh ?? 7.4;
+    this.wakefulnessDrive = opts.wakefulnessDrive ?? null;
     this.features = { ...(opts.features ?? DEFAULT_FEATURES) };
     this.seed = opts.seed ?? 1;
     this.sim = new Simulator({
@@ -171,12 +181,21 @@ export class Session {
         if (e.kind === "agitation") this.setFeatures({ agitation: "severe" });
         if (e.kind === "sedationWearsOff") this.setSedation("light");
       });
-      if (e.kind === "sedationWearsOff" && (e.resolvedAt === null || e.resolvedAt > e.at + AWAKE_AFTER)) {
+      if (
+        e.kind === "sedationWearsOff" &&
+        (e.resolvedAt === null || e.resolvedAt > e.at + AWAKE_AFTER)
+      ) {
         once("awake", e.at + AWAKE_AFTER, () => this.setSedation("awake"));
       }
       if (e.resolvedAt !== null) {
         once("resolved", e.resolvedAt, () => {
-          out.push({ type: "scenario", t: e.resolvedAt!, id: e.id, kind: e.kind, phase: "resolved" });
+          out.push({
+            type: "scenario",
+            t: e.resolvedAt!,
+            id: e.id,
+            kind: e.kind,
+            phase: "resolved",
+          });
           if (e.kind === "agitation") this.setFeatures({ agitation: "none" });
           if (e.kind === "sedationWearsOff") this.setSedation("deep");
         });
@@ -252,7 +271,8 @@ export class Session {
 
   advance(seconds: number): SessionStep {
     // With Scenario Events, step in short chunks so their effects follow time smoothly.
-    if (this.scenario.events.length === 0 || seconds <= SCENARIO_CHUNK) return this.advanceChunk(seconds);
+    if (this.scenario.events.length === 0 || seconds <= SCENARIO_CHUNK)
+      return this.advanceChunk(seconds);
     const steps: SessionStep[] = [];
     for (let done = 0; done < seconds - 1e-9; done += SCENARIO_CHUNK) {
       steps.push(this.advanceChunk(Math.min(SCENARIO_CHUNK, seconds - done)));
@@ -268,7 +288,11 @@ export class Session {
       metrics: steps.flatMap((x) => x.metrics),
       events: steps.flatMap((x) => x.events),
       alarms: steps.flatMap((x) => x.alarms),
-      physiology: steps.map((x) => x.physiology).filter((x) => x !== null).at(-1) ?? null,
+      physiology:
+        steps
+          .map((x) => x.physiology)
+          .filter((x) => x !== null)
+          .at(-1) ?? null,
     };
   }
 
@@ -353,9 +377,19 @@ export class Session {
   }
 
   private updateDrive(): void {
-    const m = chemoreflexMultiplier(this.gas.state?.ph ?? null, this.referencePh);
+    const target = chemoreflexMultiplier(this.gas.state?.ph ?? null, this.referencePh);
+    const dt = Math.max(0, this.sim.time - this.chemoTime) * this.gasTimeScale;
+    this.chemoTime = this.sim.time;
+    const tau = target > this.chemo ? CHEMO_RISE_TIME : CHEMO_FALL_TIME;
+    this.chemo = target + (this.chemo - target) * Math.exp(-dt / tau);
     this.sim.setPatient({
-      drive: effectiveDrive(this.baseDrive, this.sedation, m, this.features.agitation),
+      drive: effectiveDrive(
+        this.baseDrive,
+        this.sedation,
+        this.chemo,
+        this.features.agitation,
+        this.wakefulnessDrive ?? this.baseDrive,
+      ),
     });
   }
 
@@ -389,6 +423,7 @@ export function createProfileSession(id: ProfileId, opts: ProfileSessionOptions 
     gas: p.gas,
     circulation: p.circulation,
     referencePh: p.referencePh,
+    ...(p.wakefulnessDrive && { wakefulnessDrive: p.wakefulnessDrive }),
     sedation: opts.sedation ?? p.startSedation,
     ...(opts.features ? { features: opts.features } : {}),
     ...(opts.noiseSeed !== undefined ? { noiseSeed: opts.noiseSeed } : {}),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useStore } from "@/engine/store";
 import { GUIDE, GUIDE_BY_KIND, type GuideEntry, type GuideKind } from "@/guide/asynchrony";
 import { runExample, type ExampleTrace } from "@/guide/example";
@@ -47,7 +47,9 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: GuideKind 
   const passiveMax = Math.max(0, ...trace.passive.flatMap((p) => p.paw));
   const pHi = Math.max(20, Math.ceil(Math.max(...trace.paw, passiveMax) / 10) * 10);
   const pLo = Math.min(0, Math.floor(Math.min(...trace.paw) / 5) * 5);
-  const fAbs = Math.max(30, Math.ceil(Math.max(...trace.flow.map(Math.abs)) / 30) * 30);
+  const fAbs =
+    trace.flowZoom ?? Math.max(30, Math.ceil(Math.max(...trace.flow.map(Math.abs)) / 30) * 30);
+  const flowClip = useId();
   const yP = (p: number) => top + ROW - ((p - pLo) / (pHi - pLo)) * ROW;
   const yF = (f: number) => top + ROW + GAP + ROW / 2 - (f / fAbs) * (ROW / 2);
   const pesLo = Math.floor(Math.min(0, ...trace.pes));
@@ -144,7 +146,11 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: GuideKind 
         strokeWidth="2"
         strokeLinejoin="round"
       />
+      <clipPath id={flowClip}>
+        <rect x="0" y={top + ROW + GAP} width={W} height={ROW} />
+      </clipPath>
       <polyline
+        clipPath={`url(#${flowClip})`}
         points={line(trace.flow, yF)}
         fill="none"
         stroke="var(--trace-flow)"
@@ -182,7 +188,7 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: GuideKind 
           Paw {pHi} cmH₂O
         </text>
         <text x="4" y={top + ROW + GAP + 11}>
-          Flow ±{fAbs} L/min
+          Flow ±{fAbs} L/min{trace.flowZoom && `, ${m.flowZoomed}`}
         </text>
         {effort && (
           <text x="4" y={pesTop + 11}>

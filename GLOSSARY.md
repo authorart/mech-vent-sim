@@ -156,11 +156,11 @@ Pain, anxiety or delirium raising the patient's drive and making the pattern mor
 _Avoid_: fighting the ventilator
 
 **Chemoreflex**:
-The patient's drive rising as arterial pH falls and fading as pH rises. The chemical part of drive stops near the apneic threshold.
+The patient's drive rising as arterial pH falls and fading as pH rises. It follows the blood gas with some inertia: up within tens of seconds, back down over a minute or two. The chemical part of drive stops near the apneic threshold.
 _Avoid_: CO2 response, feedback
 
 **Wakefulness Drive**:
-The drive to breathe that an awake (or lightly sedated) patient keeps even when alkalemic. It sets a floor under the Chemoreflex; losing it in sleep or deep sedation is what lets apnea happen.
+The drive to breathe that an awake (or lightly sedated) patient keeps even when alkalemic. It sets a floor under the Chemoreflex; losing it in sleep or deep sedation is what lets apnea happen. When a disease's extra drive is purely chemical (metabolic acidosis), the floor is a normal person's, so correcting the acidosis brings back normal breathing.
 _Avoid_: baseline drive
 
 ## Patient–ventilator interaction

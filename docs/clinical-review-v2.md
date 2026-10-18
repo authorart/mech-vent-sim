@@ -37,7 +37,8 @@ Viscoelastic tissue (the slow pressure fall during a pause): 3 cmH2O/(L/s) with 
 | Natural breathing variability | Rate 10%, depth 15%, inspiratory time 10% (coefficients of variation) | |
 | Sighs | About 1 in 60 efforts: 2× depth, 1.4× Ti, 1.5× cycle | |
 | Agitation (moderate / severe) | P_mus ×1.5 / ×2; rate ×1.3 / ×1.6; variability ×1.5 / ×2; raises the drive floor by 0.3 / 0.6 | |
-| Wakefulness drive floor | Awake 0.4, light 0.15 (multiplier under the chemoreflex) | |
+| Wakefulness drive floor | Awake 0.4, light 0.15 (multiplier under the chemoreflex), of the profile's own drive; metabolic acidosis uses a normal drive (14 /min, P_mus 5) because its extra drive is all chemical | |
+| Chemoreflex inertia | Drive rises toward its pH target with τ 20 s, falls with τ 90 s | |
 | Reverse triggering | Entrained effort of 8 cmH2O starting 0.35 s after each machine breath, Ti 0.7 s | |
 | Expiratory muscles | Up to 0.8 × P_mus when inflation outlasts the patient's inspiration (builds over 0.08 s) | |
 | Neural effort shape | (1 − cos) rise over Ti, relaxation over half of Ti; Ti = 35% of the neural cycle | |
@@ -124,4 +125,14 @@ Teaching behavior you may want to check:
 - Mode asynchrony comes from the physics: the patient's effort doesn't depend on the breath type. In awake cardiogenic edema at V-SIMV rate 6, muscle effort is the same on every breath and the esophageal swing on the Mandatory Breath is about 80% of the spontaneous one (6.6 vs 8.2 cmH2O), matching fig. 15-10 ("nearly as great").
 - High-drive patients (metabolic acidosis) often re-trigger straight after a short V-SIMV Mandatory Breath: a double trigger, where the spontaneous breath stacks on the mandatory one.
 - A low PS (5) gives small spontaneous breaths (~300 mL in cardiogenic edema), which can set off the low exhaled Vt alarm.
+
+## 9. High drive and alarms (after M16)
+
+| Item | Value | Note |
+| --- | --- | --- |
+| Severe metabolic acidosis, untreated, VCV Vt 500 / 60 L/min | pH ~7.29, P_mus ~10–11, premature cycling every breath, double triggering ~10/min | Persists for as long as the case runs |
+| Same, HCO₃⁻ corrected to 22 | Drive back to normal within ~3 min; double triggering gone | Treating the cause |
+| Same, recommended start (Vt 8 mL/kg, RR 28, Ti 0.7 s) | Double triggering roughly halved or better, premature cycling reduced | The ventilator meets more of the demand |
+| Circuit disconnect alarm | Exhaled volume < 20% of inhaled over the last 3 breaths together | One barely-exhaled breath in a stacked pair no longer alarms |
+| Premature cycling guide example | Metabolic acidosis, PSV 18, Esens 50%, after 3 min; flow axis zoomed to ±90 L/min | Shows the expiratory bump (Hamilton reference card) |
 
