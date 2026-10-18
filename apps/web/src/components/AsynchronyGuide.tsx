@@ -22,7 +22,7 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: GuideKind 
   const effort = trace.pes.length > 0;
 
   // Event labels in up to three rows above the plot so they never overlap.
-  const labels = effort
+  const labels = trace.labelBreaths
     ? trace.breaths
         .filter((b) => b.t >= 0)
         .map((b) => ({
@@ -39,7 +39,10 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: GuideKind 
   const lanes = Math.max(1, ...rows.map((r) => r + 1));
   const top = lanes * LANE + 8;
   const pesTop = top + ROW * 2 + GAP * 2;
-  const H = (effort ? pesTop + ROW : top + ROW * 2 + GAP) + 4;
+  // Time scale under the traces, one tick a second.
+  const axisY = (effort ? pesTop + ROW : top + ROW * 2 + GAP) + 6;
+  const H = axisY + 18;
+  const seconds = Array.from({ length: Math.floor(tMax + 1e-6) + 1 }, (_, s) => s);
 
   const passiveMax = Math.max(0, ...trace.passive.flatMap((p) => p.paw));
   const pHi = Math.max(20, Math.ceil(Math.max(...trace.paw, passiveMax) / 10) * 10);
@@ -104,7 +107,7 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: GuideKind 
               x1={l.x}
               x2={l.x}
               y1={y + 3}
-              y2={H}
+              y2={axisY}
               stroke={own ? "var(--ink-2)" : "var(--ink-3)"}
               strokeDasharray="3 3"
               opacity={own ? 0.8 : 0.45}
@@ -148,6 +151,24 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: GuideKind 
         strokeWidth="2"
         strokeLinejoin="round"
       />
+      <g stroke="var(--grid)">
+        <line x1="0" x2={W} y1={axisY} y2={axisY} />
+        {seconds.map((s) => (
+          <line key={s} x1={x(s)} x2={x(s)} y1={axisY} y2={axisY + 4} />
+        ))}
+      </g>
+      <g fill="var(--ink-3)" fontSize="11">
+        {seconds.map((s) => (
+          <text
+            key={s}
+            x={x(s)}
+            y={axisY + 15}
+            textAnchor={s === 0 ? "start" : x(s) > W - 8 ? "end" : "middle"}
+          >
+            {s === seconds.at(-1) ? `${s} s` : s}
+          </text>
+        ))}
+      </g>
       {/* Axis names last, with a halo, so marker lines and traces never run through them. */}
       <g
         fill="var(--ink-3)"
@@ -200,6 +221,7 @@ function Card({ entry, onShow }: { entry: GuideEntry; onShow: () => void }) {
             seconds: entry.example.seconds ?? 8,
           })}{" "}
           {entry.example.comparePassive && m.exampleCompare}
+          {entry.example.showPes && m.examplePes}
         </figcaption>
       </figure>
       <div className="grid gap-5 md:grid-cols-3">
@@ -243,7 +265,7 @@ export function AsynchronyGuide({ open, onClose }: { open: boolean; onClose: () 
     send({ type: "setSedation", level: ex.sedation });
     send({ type: "setPatientFeatures", features: ex.features });
     useStore.setState({ showLabels: true });
-    if (ex.showEffort) useStore.setState({ extraTrace: "pes" });
+    if (ex.showEffort || ex.showPes) useStore.setState({ extraTrace: "pes" });
     onClose();
   };
 

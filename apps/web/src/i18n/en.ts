@@ -17,6 +17,7 @@ export const en = {
     "Example from the simulator, {seconds} seconds. Markers show what was detected; this card's type is in bold.",
   exampleEffort:
     "Example from the simulator, {seconds} seconds. Bold: mandatory breaths. Bottom row: esophageal pressure, which dips with each patient effort.",
+  examplePes: "Bottom row: esophageal pressure, which dips while the patient breathes in.",
   mandatoryShort: "Mandatory",
   spontaneousShort: "Spont.",
   exampleCompare:
@@ -160,6 +161,8 @@ export const en = {
 
   instructor: "Instructor",
   closeInstructor: "Close instructor panel",
+  showAllSections: "Show all",
+  hideAllSections: "Hide all",
   profile: "Patient profile",
   loadProfile: "Load profile",
   loadProfileHint:

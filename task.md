@@ -246,6 +246,8 @@ Each milestone ends with tests passing, the V1 profile signatures re-checked, an
 
 _M16 notes:_ breath type is on every BreathRecord and `breathStart` event; the classifier now credits a trigger to the effort that crossed the threshold, even if it ends during the 80 ms trigger delay (these were mislabeled autotriggers, now double triggers). 167 engine tests.
 
+_After M16 (2026-10-18):_ fixed top bar (alarms on their own row) and a two-row settings bar · Instructor sections show/hide with Show all / Hide all · seconds scale under the live and guide waveforms · premature cycling example rebuilt from the references (Gentile 2011; Hamilton asynchrony card): ARDS on PSV 15 with Esens 50%, giving a cut, doubled expiratory peak, with esophageal pressure shown; tested against Esens 5%. 169 engine tests.
+
 ### Later (not in V2)
 
 Adaptive modes (PRVC/volume support) · PSV periodic breathing with sleep · two-compartment lung · seeded random profile values · accounts and saved Scenarios · Thai localization

@@ -45,6 +45,9 @@ interface Store {
   showLabels: boolean;
   /** Show the Targets card to learners (instructor's choice, R6-Q11). */
   showTargets: boolean;
+  /** Instructor Panel sections the instructor has hidden (remembered on this device). */
+  hiddenSections: string[];
+  setHiddenSections: (ids: string[]) => void;
   /** Optional 4th waveform (M15). */
   extraTrace: ExtraTrace;
   /** Dynamic compliance collected per PEEP for a decremental PEEP trial (M14). */
@@ -75,6 +78,17 @@ const MAX_MARKS = 80;
 const PEEP_TRIAL_BREATHS = 8;
 const LOG_LENGTH = 12;
 
+const HIDDEN_SECTIONS_KEY = "medvent.hiddenSections";
+
+function loadHiddenSections(): string[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(HIDDEN_SECTIONS_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export const useStore = create<Store>((set, get) => ({
   connection: "connecting",
   error: null,
@@ -93,6 +107,15 @@ export const useStore = create<Store>((set, get) => ({
   asynchronyLog: [],
   showLabels: false,
   showTargets: false,
+  hiddenSections: loadHiddenSections(),
+  setHiddenSections: (ids) => {
+    set({ hiddenSections: ids });
+    try {
+      localStorage.setItem(HIDDEN_SECTIONS_KEY, JSON.stringify(ids));
+    } catch {
+      // Private window or blocked storage: the choice lasts until reload.
+    }
+  },
   extraTrace: "off",
   peepTrial: {},
 

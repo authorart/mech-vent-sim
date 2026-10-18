@@ -15,6 +15,8 @@ export interface ExampleTrace {
   marks: { t: number; kind: AsynchronyKind }[];
   /** When each breath started, and its type. */
   breaths: { t: number; type: BreathType }[];
+  /** Label breaths by type instead of marking asynchronies. */
+  labelBreaths: boolean;
   /**
    * For comparison examples: the airway pressure of the same breath with no patient effort,
    * drawn from each breath's start (Hess & Kacmarek fig. 15-6, the dashed line).
@@ -76,6 +78,7 @@ export function runExample(ex: Example): ExampleTrace {
     pes: [],
     marks: [],
     breaths: [],
+    labelBreaths: ex.showEffort === true,
     passive: [],
   };
   const d = step.samples;
@@ -83,7 +86,7 @@ export function runExample(ex: Example): ExampleTrace {
     out.t.push(d[i + SAMPLE.T]! - settle);
     out.paw.push(d[i + SAMPLE.PAW]!);
     out.flow.push(d[i + SAMPLE.FLOW]! * 60);
-    if (ex.showEffort) out.pes.push(d[i + SAMPLE.PES]!);
+    if (ex.showEffort || ex.showPes) out.pes.push(d[i + SAMPLE.PES]!);
   }
   for (const e of step.events) {
     if (e.type === "asynchrony") out.marks.push({ t: e.t - settle, kind: e.kind });

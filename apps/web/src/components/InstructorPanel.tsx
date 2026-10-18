@@ -66,11 +66,58 @@ function Slider({
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/** Every section, top to bottom, for Show all / Hide all. */
+const SECTION_IDS = [
+  "profile",
+  "sedation",
+  "breathing",
+  "targets",
+  "peepTrial",
+  "scenario",
+  "asynchrony",
+  "patient",
+  "mechanics",
+  "gas",
+  "drive",
+  "share",
+  "simulation",
+];
+
+/** A panel section the instructor can show or hide by its heading. */
+function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  const hidden = useStore((s) => s.hiddenSections.includes(id));
+  const setHidden = useStore((s) => s.setHiddenSections);
+  const bodyId = `instructor-${id}`;
   return (
-    <section className="flex flex-col gap-3 border-t border-edge pt-4">
-      <h3 className="font-medium">{title}</h3>
-      {children}
+    <section className="flex flex-col gap-3 border-t border-edge pt-3">
+      <h3>
+        <button
+          type="button"
+          aria-expanded={!hidden}
+          aria-controls={bodyId}
+          onClick={() => {
+            const now = useStore.getState().hiddenSections;
+            setHidden(hidden ? now.filter((x) => x !== id) : [...now, id]);
+          }}
+          className="-mx-1 flex w-[calc(100%+0.5rem)] items-center justify-between gap-2 rounded px-1 py-0.5 text-left font-medium hover:bg-panel"
+        >
+          {title}
+          <svg
+            aria-hidden
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            className={`shrink-0 text-ink-3 transition-transform ${hidden ? "" : "rotate-180"}`}
+          >
+            <path d="M3 5 L7 9 L11 5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          </svg>
+        </button>
+      </h3>
+      {!hidden && (
+        <div id={bodyId} className="flex flex-col gap-3">
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -155,6 +202,7 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
   const sex = useStore((s) => s.sex);
   const heightCm = useStore((s) => s.heightCm);
   const setPatientSize = useStore((s) => s.setPatientSize);
+  const setHiddenSections = useStore((s) => s.setHiddenSections);
   const pbw = usePbw();
   const [profileChoice, setProfileChoice] = useState<ProfileId | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -186,8 +234,25 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
         </button>
       </div>
 
-      <section className="flex flex-col gap-2">
-        <label htmlFor="profile" className="text-sm text-ink-2">
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setHiddenSections([])}
+          className="rounded border border-edge px-3 py-1 text-sm text-ink-2 hover:bg-panel hover:text-ink"
+        >
+          {m.showAllSections}
+        </button>
+        <button
+          type="button"
+          onClick={() => setHiddenSections(SECTION_IDS)}
+          className="rounded border border-edge px-3 py-1 text-sm text-ink-2 hover:bg-panel hover:text-ink"
+        >
+          {m.hideAllSections}
+        </button>
+      </div>
+
+      <Section id="profile" title={m.profile}>
+        <label htmlFor="profile" className="sr-only">
           {m.profile}
         </label>
         <select
@@ -218,9 +283,9 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
             </button>
           </>
         )}
-      </section>
+      </Section>
 
-      <Section title={m.sedation}>
+      <Section id="sedation" title={m.sedation}>
         <Segmented<SedationLevel>
           label={m.sedation}
           value={engine.sedation}
@@ -236,7 +301,7 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
         </p>
       </Section>
 
-      <Section title={m.breathingPattern}>
+      <Section id="breathing" title={m.breathingPattern}>
         <Segmented<PatientFeatures["breathing"]>
           label={m.breathingPattern}
           value={engine.features.breathing}
@@ -291,7 +356,7 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
 
       <AsynchronySection />
 
-      <Section title={m.patient}>
+      <Section id="patient" title={m.patient}>
         <Segmented<Sex>
           label="Sex"
           value={sex}
@@ -317,7 +382,7 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
         </p>
       </Section>
 
-      <Section title={m.mechanics}>
+      <Section id="mechanics" title={m.mechanics}>
         <Slider
           label="Compliance"
           unit="mL/cmH₂O"
@@ -347,7 +412,7 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
         />
       </Section>
 
-      <Section title={m.gasExchange}>
+      <Section id="gas" title={m.gasExchange}>
         <Slider
           label="Shunt (no PEEP)"
           unit="%"
@@ -386,7 +451,7 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
         />
       </Section>
 
-      <Section title={m.drive}>
+      <Section id="drive" title={m.drive}>
         <Slider
           label="Neural rate"
           unit="/min"
@@ -407,11 +472,11 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
         />
       </Section>
 
-      <Section title={m.shareHeading}>
+      <Section id="share" title={m.shareHeading}>
         <ShareCase />
       </Section>
 
-      <Section title={m.simulation}>
+      <Section id="simulation" title={m.simulation}>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -466,7 +531,7 @@ function AsynchronySection() {
       )
     : [];
   return (
-    <Section title={m.asynchronyHeading}>
+    <Section id="asynchrony" title={m.asynchronyHeading}>
       <span className="text-sm text-ink-2">{m.labelsOnWaveforms}</span>
       <Segmented<"off" | "on">
         label={m.labelsOnWaveforms}
@@ -528,7 +593,7 @@ function ScenarioSection() {
   };
 
   return (
-    <Section title={m.scenarioHeading}>
+    <Section id="scenario" title={m.scenarioHeading}>
       <p className="text-xs text-ink-3">{m.scenarioHint}</p>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
         <label className="flex flex-col gap-1 text-sm text-ink-2">
@@ -618,7 +683,7 @@ function TargetsSection() {
   const pbw = usePbw();
   if (!engine) return null;
   return (
-    <Section title={m.targetsHeading}>
+    <Section id="targets" title={m.targetsHeading}>
       <p className="text-xs text-ink-3">{m.targetsHint}</p>
       <span className="text-sm text-ink-2">{m.showTargets}</span>
       <Segmented<"off" | "on">
@@ -656,7 +721,7 @@ function PeepTrialSection() {
     .sort((a, b) => b.peep - a.peep);
   const best = rows.length >= 2 ? rows.reduce((a, b) => (b.cdyn > a.cdyn ? b : a)) : null;
   return (
-    <Section title={m.peepTrialHeading}>
+    <Section id="peepTrial" title={m.peepTrialHeading}>
       <p className="text-xs text-ink-3">{m.peepTrialHint}</p>
       {rows.length === 0 ? (
         <p className="text-sm text-ink-3">{m.peepTrialNone}</p>

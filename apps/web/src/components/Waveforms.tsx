@@ -81,6 +81,8 @@ const EXTRA_ROWS: Record<"pes" | "co2", Row> = {
 
 const AXIS_W = 44;
 const ROW_GAP = 10;
+/** Height of the time scale under the traces (px). */
+const TIME_AXIS_H = 20;
 
 function extent(a: Float32Array): [number, number] {
   let lo = Infinity;
@@ -183,7 +185,7 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
       lastRows = rowList;
 
       ctx.clearRect(0, 0, w, h);
-      const rowH = (h - ROW_GAP * (rowList.length - 1)) / rowList.length;
+      const rowH = (h - TIME_AXIS_H - ROW_GAP * (rowList.length - 1)) / rowList.length;
       const plotW = w - AXIS_W;
       const n = sweep.size;
       const xAt = (i: number) => AXIS_W + (i / (n - 1)) * plotW;
@@ -269,6 +271,33 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
         }
         ctx.stroke();
       });
+
+      // Time scale: seconds across the sweep, a tick each second (labels every 2 s when narrow).
+      const axisY = Math.round(h - TIME_AXIS_H + 4) + 0.5;
+      const every = plotW / SWEEP_SECONDS < 32 ? 2 : 1;
+      ctx.strokeStyle = colors.grid;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(AXIS_W, axisY);
+      ctx.lineTo(w, axisY);
+      for (let s = 0; s <= SWEEP_SECONDS; s++) {
+        const x = Math.round(xAt(Math.min(n - 1, s * (n / SWEEP_SECONDS)))) + 0.5;
+        ctx.moveTo(x, axisY);
+        ctx.lineTo(x, axisY + 4);
+      }
+      ctx.stroke();
+      ctx.font = `11px ${family}`;
+      ctx.textBaseline = "top";
+      ctx.fillStyle = colors.ink3;
+      ctx.textAlign = "right";
+      ctx.fillText("s", AXIS_W - 8, axisY + 4);
+      for (let s = 0; s <= SWEEP_SECONDS; s += every) {
+        const x = xAt(Math.min(n - 1, s * (n / SWEEP_SECONDS)));
+        ctx.textAlign = s === 0 ? "left" : s === SWEEP_SECONDS ? "right" : "center";
+        ctx.fillText(String(s), x, axisY + 5);
+      }
+      ctx.font = `12px ${family}`;
+      ctx.textBaseline = "middle";
 
       // Asynchrony labels (instructor's choice): a tick on the flow trace and a short name,
       // stacked in up to three rows so neighbours never overlap.

@@ -24,6 +24,8 @@ export interface Example {
   comparePassive?: boolean;
   /** Show the patient's effort (esophageal pressure) and label breaths by type, not asynchrony. */
   showEffort?: boolean;
+  /** Show esophageal pressure under the traces, keeping the asynchrony markers. */
+  showPes?: boolean;
   /** Seconds shown (default 8). */
   seconds?: number;
 }
@@ -227,24 +229,30 @@ export const GUIDE: GuideEntry[] = [
     family: "Cycle",
     summary: "The ventilator ends inspiration while the patient is still breathing in.",
     recognize: [
-      "Right after the breath ends, expiratory flow is pulled back toward zero (or above it) by the continuing effort.",
-      "Often followed by a double trigger.",
+      "Expiratory flow: the first expiratory peak is cut short, then flow is pulled back toward zero while the patient keeps breathing in, and a second, later peak follows when the effort ends: a cut, delayed or 'doubled' expiratory peak.",
+      "The breath is short: inspiration ends early in the patient's effort. On esophageal pressure the patient's dip carries on into expiration.",
+      "Often followed by a double trigger, when the effort pulls the flow past the trigger.",
     ],
     why: [
-      "Inspiratory time set shorter than the patient's own (VCV with high flow, short PCV Ti).",
-      "In PSV: low compliance makes flow fall to Esens quickly; a high Esens does the same.",
+      "In PSV with stiff lungs (ARDS, low compliance): inspiratory flow falls to Esens within a fraction of a second, long before the patient has finished breathing in. A high Esens or a fast rise makes it worse.",
+      "Inspiratory time set shorter than the patient's own (VCV with high flow and small Vt, short PCV Ti).",
+      "A high drive: the patient wants a longer, bigger breath than the ventilator gives.",
     ],
     fix: [
-      "Lengthen Ti (VCV: lower flow, decelerating ramp, pause; PCV: longer Ti).",
-      "PSV: lower Esens.",
+      "PSV: lower Esens (about 5–10% in stiff lungs) and use a slower rise, so the breath lasts longer.",
+      "VCV: lower the flow or use a decelerating ramp; PCV: lengthen Ti to match the patient.",
+      "Treat the high drive (hypoxemia, acidosis, pain, anxiety).",
     ],
-    source: "Ch. 15 (fig. 15-8), ch. 9",
+    source:
+      "Ch. 15 (fig. 15-8), ch. 9; Gentile MA, Respir Care 2011;56:52 (cycling); Hamilton Medical asynchrony reference card",
     example: {
       profileId: "ards",
-      settings: pcv({ inspTime: 0.4, rate: 20 }),
-      sedation: "light",
+      settings: psv({ pSupport: 15, esens: 0.5 }),
+      sedation: "awake",
       features: features(),
-      watch: "PCV Ti 0.4 s: expiratory flow is pulled up right after each breath ends. Lengthen Ti to 0.8 s.",
+      showPes: true,
+      watch:
+        "ARDS on PSV 15 with Esens 50%: each breath ends after about a quarter of a second while the patient is still breathing in. Expiratory flow dips, is pulled back to about zero, then dips again when the effort stops (two expiratory peaks). Lower Esens to 5% and expiration becomes one smooth curve, with bigger breaths.",
     },
   },
   {

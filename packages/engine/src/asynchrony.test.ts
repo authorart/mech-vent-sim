@@ -173,3 +173,61 @@ describe("Breathing pattern", () => {
     expect(agitated.intervalCv).toBeGreaterThan(calm.intervalCv);
   });
 });
+
+describe("Premature cycling waveform (Gentile 2011; Hamilton asynchrony card)", () => {
+  /** Expiratory flow (L/min) of each breath from cycle-off to 1 s later. */
+  function expiratoryFlows(esens: number): number[][] {
+    const settings: PsvSettings = {
+      ...(settingsForMode("PSV", INITIAL_SETTINGS) as PsvSettings),
+      pSupport: 15,
+      esens,
+    };
+    const s = createProfileSession("ards", {
+      settings,
+      sedation: "awake",
+      noiseSeed: null,
+      features: { ...DEFAULT_FEATURES, breathing: "regular", cardiacOscillation: "off" },
+    });
+    s.advance(40);
+    const r = s.sim.advance(15);
+    return r.breaths.map((b) => {
+      const end = b.startTime + b.inspTime;
+      const out: number[] = [];
+      for (let i = 0; i < r.samples.length; i += SAMPLE.STRIDE) {
+        const t = r.samples[i + SAMPLE.T]!;
+        if (t > end + 0.02 && t <= end + 1) out.push(r.samples[i + SAMPLE.FLOW]! * 60);
+      }
+      return out;
+    });
+  }
+
+  /** First expiratory peak, the recovery toward zero after it, and the deepest flow after that. */
+  function shape(f: number[]) {
+    let k = 1;
+    while (k < f.length && f[k]! <= f[k - 1]!) k++;
+    const first = f[k - 1]!;
+    let j = k;
+    let recovery = first;
+    while (j < f.length && f[j]! >= f[j - 1]!) recovery = f[j++]!;
+    const second = Math.min(...f.slice(j), recovery);
+    return { first, recovery, second };
+  }
+
+  it("high Esens in a stiff lung: a cut first expiratory peak, flow pulled back, then a second peak", () => {
+    const flows = expiratoryFlows(0.5);
+    expect(flows.length).toBeGreaterThanOrEqual(4);
+    for (const f of flows) {
+      const { first, recovery, second } = shape(f);
+      expect(recovery - first).toBeGreaterThan(8);
+      expect(second).toBeLessThan(recovery - 10);
+      expect(first).toBeLessThan(-15);
+    }
+  });
+
+  it("a low Esens lets the breath last: one smooth expiratory curve", () => {
+    for (const f of expiratoryFlows(0.05)) {
+      const { recovery, second } = shape(f);
+      expect(second).toBeGreaterThan(recovery - 2);
+    }
+  });
+});
