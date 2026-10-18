@@ -49,7 +49,7 @@ export function TargetsCard() {
           <tr className="text-left text-xs text-ink-3">
             <th className="pb-1 font-normal">{m.targetMeasure}</th>
             <th className="pb-1 text-right font-normal">{m.targetNow}</th>
-            <th className="pb-1 text-right font-normal">{m.targetGoal}</th>
+            <th className="pb-1 pl-3 text-right font-normal whitespace-nowrap">{m.targetGoal}</th>
             <th className="pb-1 pl-2 font-normal">
               <span className="sr-only">{m.targetStatus}</span>
             </th>
@@ -64,10 +64,10 @@ export function TargetsCard() {
                 <td className="py-1 text-ink-2">
                   {meta.label} {meta.unit && <span className="text-xs text-ink-3">{meta.unit}</span>}
                 </td>
-                <td className="py-1 text-right font-readout text-ink tabular">
+                <td className="py-1 pl-2 text-right font-readout whitespace-nowrap text-ink tabular">
                   {r.value === null ? "–" : num(r.value, meta.decimals)}
                 </td>
-                <td className="py-1 text-right text-ink-2 tabular">{range(r)}</td>
+                <td className="py-1 pl-3 text-right whitespace-nowrap text-ink-2 tabular">{range(r)}</td>
                 <td className={`py-1 pl-2 ${mark.className}`}>
                   <span aria-hidden>{mark.symbol}</span>
                   <span className="sr-only">{m.targetStatusWord[r.status]}</span>
