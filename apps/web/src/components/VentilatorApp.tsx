@@ -48,7 +48,7 @@ export function VentilatorApp() {
           aria-label="Waveforms"
           className="flex min-h-[340px] flex-col rounded-lg bg-glass p-2 sm:min-h-[380px] sm:p-3"
         >
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <div role="tablist" aria-label="Display" className="flex gap-1">
               {(["waveforms", "loops"] as const).map((v) => (
                 <button
@@ -66,13 +66,13 @@ export function VentilatorApp() {
               ))}
             </div>
             {view === "waveforms" && (
-              <label className="ml-auto flex items-center gap-1.5 text-sm text-ink-2">
+              <label className="ml-auto flex min-w-0 items-center gap-1.5 text-sm text-ink-2">
                 <span className="hidden sm:inline">{m.extraTrace}</span>
                 <select
                   aria-label={m.extraTrace}
                   value={extraTrace}
                   onChange={(e) => useStore.setState({ extraTrace: e.target.value as ExtraTrace })}
-                  className="rounded border border-edge bg-panel px-1.5 py-1 text-ink"
+                  className="max-w-[9.5rem] min-w-0 rounded border border-edge bg-panel px-1.5 py-1 text-ink sm:max-w-none"
                 >
                   {(["off", "pes", "co2"] as const).map((v) => (
                     <option key={v} value={v}>
