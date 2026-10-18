@@ -42,6 +42,14 @@ _Avoid_: default settings, presets
 The controls an instructor uses to change Patient Profile values while the patient is running.
 _Avoid_: admin panel, god mode
 
+**Treatment (of a Scenario Event)**:
+The instructor's action that reverses an event: decompression, reinflating the cuff, sealing the leak, a bronchodilator, suction, treating agitation, re-sedation.
+_Avoid_: fix, undo, resolve (fine in code, not in the UI)
+
+**Leak**:
+Gas the ventilator delivers that doesn't come back through the circuit: around the tube cuff, or through a bronchopleural fistula. Exhaled volume falls below inhaled volume and the volume trace doesn't return to zero.
+_Avoid_: disconnection (that's total), air loss
+
 **Scenario**:
 A Patient Profile plus a timeline of Scenario Events, making up one teaching case.
 _Avoid_: case, exercise, simulation

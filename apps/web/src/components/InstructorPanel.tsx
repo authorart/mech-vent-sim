@@ -2,6 +2,9 @@
 
 import {
   PROFILES,
+  progression,
+  SCENARIO_KINDS,
+  type ScenarioEventKind,
   type Agitation,
   type PatientFeatures,
   type ProfileId,
@@ -278,6 +281,8 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
         <p className="text-xs text-ink-3">{m.cardiacHint}</p>
       </Section>
 
+      <ScenarioSection />
+
       <AsynchronySection />
 
       <Section title={m.patient}>
@@ -496,6 +501,104 @@ function AsynchronySection() {
             ))}
           </ol>
         </div>
+      )}
+    </Section>
+  );
+}
+
+/** Scenario Events (M13): add events now or later, and treat them. */
+function ScenarioSection() {
+  const send = useStore((s) => s.send);
+  const events = useStore((s) => s.engine?.scenario ?? []);
+  const now = useStore((s) => Math.max(s.metrics?.t ?? 0, s.engine?.time ?? 0));
+  const [kind, setKind] = useState<ScenarioEventKind>("tensionPneumothorax");
+  const [delay, setDelay] = useState<keyof typeof m.scenarioDelays>("0");
+
+  const status = (e: (typeof events)[number]) => {
+    if (now < e.at) return fmt(m.scenarioStartsIn, { s: num(e.at - now, 0) });
+    if (e.resolvedAt !== null && now >= e.resolvedAt) return m.scenarioTreated;
+    const p = progression(e, now);
+    return p < 0.99 ? fmt(m.scenarioDeveloping, { p: num(p * 100, 0) }) : m.scenarioActive;
+  };
+
+  return (
+    <Section title={m.scenarioHeading}>
+      <p className="text-xs text-ink-3">{m.scenarioHint}</p>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+        <label className="flex flex-col gap-1 text-sm text-ink-2">
+          {m.scenarioEvent}
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value as ScenarioEventKind)}
+            className="rounded border border-edge bg-panel px-2 py-1.5 text-ink"
+          >
+            {SCENARIO_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {m.scenarioKind[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-ink-2">
+          {m.scenarioWhen}
+          <select
+            value={delay}
+            onChange={(e) => setDelay(e.target.value as keyof typeof m.scenarioDelays)}
+            className="rounded border border-edge bg-panel px-2 py-1.5 text-ink"
+          >
+            {(Object.keys(m.scenarioDelays) as (keyof typeof m.scenarioDelays)[]).map((d) => (
+              <option key={d} value={d}>
+                {m.scenarioDelays[d]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="text-xs text-ink-3">{m.scenarioDescription[kind]}</p>
+      <button
+        type="button"
+        onClick={() => send({ type: "scheduleEvent", kind, delay: Number(delay) })}
+        className="self-start rounded bg-pending px-3 py-1.5 text-sm font-medium text-chrome"
+      >
+        {m.scenarioAdd}
+      </button>
+      {events.length === 0 ? (
+        <p className="text-sm text-ink-3">{m.scenarioNone}</p>
+      ) : (
+        <ol className="flex flex-col gap-2">
+          {events.map((e) => {
+            const treated = e.resolvedAt !== null && now >= e.resolvedAt;
+            const started = now >= e.at;
+            return (
+              <li key={e.id} className="rounded border border-edge p-2 text-sm">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-ink">{m.scenarioKind[e.kind]}</span>
+                  <span className="text-xs text-ink-3">{status(e)}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {started && !treated && (
+                    <button
+                      type="button"
+                      onClick={() => send({ type: "resolveEvent", id: e.id })}
+                      className="rounded border border-edge px-2 py-1 hover:bg-panel"
+                    >
+                      {m.scenarioTreat[e.kind]}
+                    </button>
+                  )}
+                  {(!started || treated) && (
+                    <button
+                      type="button"
+                      onClick={() => send({ type: "cancelEvent", id: e.id })}
+                      className="rounded border border-edge px-2 py-1 text-ink-2 hover:bg-panel"
+                    >
+                      {m.scenarioRemove}
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
       )}
     </Section>
   );

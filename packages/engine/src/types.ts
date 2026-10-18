@@ -1,3 +1,5 @@
+import type { ScenarioEventKind } from "./scenario";
+
 /**
  * Core Engine types. All internal quantities use the Engine's unit system:
  * volume L · flow L/s (+ = inspiratory) · pressure cmH2O · time s · compliance L/cmH2O ·
@@ -170,6 +172,12 @@ export interface BreathRecord {
   endExpRecruited: number;
   /** Asynchronies that belong to this breath (ineffective triggers arrive as events instead). */
   asynchronies: AsynchronyKind[];
+  /**
+   * Volumes that actually entered and left the alveoli (engine truth). They differ from
+   * vti/vte, which the ventilator measures, when there is a leak (M13).
+   */
+  lungVti: number;
+  lungVte: number;
 }
 
 export type EngineEvent =
@@ -179,6 +187,13 @@ export type EngineEvent =
   | { type: "apneaBackupEnded"; t: number }
   | { type: "highPressureCycle"; t: number; paw: number }
   | { type: "asynchrony"; t: number; kind: AsynchronyKind }
+  | {
+      type: "scenario";
+      t: number;
+      id: number;
+      kind: ScenarioEventKind;
+      phase: "started" | "resolved";
+    }
   | { type: "plateauMeasured"; t: number; plateau: number; reliable: boolean }
   | {
       type: "totalPeepMeasured";

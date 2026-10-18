@@ -94,6 +94,9 @@ export const ASYNC_STARVATION_PMUS = 3;
 /** Premature cycling counts only if the patient is still pulling at least this hard (cmH2O), so it shows. */
 export const ASYNC_PREMATURE_PMUS = 2.5;
 
+/** Secretions (M13): sawtooth on the displayed traces, scaled by airflow. */
+export const SECRETION_SAW = { hz: 9, paw: 0.8, flow: 0.1 };
+
 /** Displayed-signal noise (1 SD): pressure cmH2O, flow L/s. Physics and metrics stay noise-free. */
 export const SIGNAL_NOISE = { paw: 0.04, flow: 0.004 };
 
@@ -144,6 +147,8 @@ interface BreathAccumulator {
   highPressureCycled: boolean;
   cycle: CycleReason;
   asynchronies: AsynchronyKind[];
+  lungVti: number;
+  lungVte: number;
   /** Largest Muscle Pressure during inspiration, and lowest airway pressure after 0.1 s. */
   maxPullPmus: number;
   minInspPaw: number;
@@ -224,6 +229,12 @@ export class Simulator {
   private pcard = 0;
 
   private noise: (() => number) | null = null;
+
+  /** Scenario leaks (L/s per cmH2O): around the tube cuff, and from alveoli to pleura. */
+  cuffLeak = 0;
+  fistulaLeak = 0;
+  /** Secretions in the airway (0–1), for the sawtooth on the displayed traces. */
+  secretions = 0;
 
   /** Largest Muscle Pressure seen during the current pause or hold. */
   private maneuverEffort = 0;
@@ -323,8 +334,8 @@ export class Simulator {
     this.updateServo(t0);
     const control = this.control();
 
-    // RK4 on elastic volume.
-    const f = (t: number, v: number) => this.flowFor(control, t, v);
+    // RK4 on elastic volume: airway inflow minus any leak through a fistula.
+    const f = (t: number, v: number) => this.flowFor(control, t, v) - this.fistulaFlow(t, v);
     const v0 = this.volume;
     const k1 = f(t0, v0);
     const k2 = f(t0 + DT / 2, v0 + (DT / 2) * k1);
@@ -332,7 +343,6 @@ export class Simulator {
     const k4 = f(t0 + DT, v0 + DT * k3);
     const dv = (DT / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
     this.volume = v0 + dv;
-    this.displayVolume += dv;
     this.step++;
 
     const t = this.step * DT;
@@ -341,29 +351,41 @@ export class Simulator {
     const flow = this.flowFor(control, t, this.volume);
     const paw = this.pawFor(control, t, this.volume, net, flow);
     const palv = this.lung.alveolarPressure(this.volume, net);
+    // What the ventilator's sensors see: airway flow plus anything lost around the cuff.
+    const measured = flow + this.cuffLeak * Math.max(0, paw);
+    const leaking = this.cuffLeak > 0 || this.fistulaLeak > 0;
+    const shown = leaking ? measured * DT : dv;
+    this.displayVolume += shown;
     this.lastPaw = paw;
-    this.lastFlow = flow;
+    this.lastFlow = measured;
     if (this.phase === "pause" || this.phase === "expiratoryHold") {
       this.maneuverEffort = Math.max(this.maneuverEffort, pmus, this.pexp);
     }
 
     if (this.acc) {
-      if (dv > 0) this.acc.vti += dv;
-      else this.acc.vte -= dv;
+      if (shown > 0) this.acc.vti += shown;
+      else this.acc.vte -= shown;
+      if (dv > 0) this.acc.lungVti += dv;
+      else this.acc.lungVte -= dv;
       this.acc.peakPaw = Math.max(this.acc.peakPaw, paw);
       this.acc.sumPaw += paw;
       this.acc.n++;
       if (this.phase === "inspiration") {
-        this.acc.peakInspFlow = Math.max(this.acc.peakInspFlow, flow);
+        this.acc.peakInspFlow = Math.max(this.acc.peakInspFlow, measured);
       }
     }
 
     if (this.step % OUTPUT_EVERY === 0) {
       const n = this.noise;
+      // Secretions: gas bubbling through mucus gives a sawtooth while air is moving.
+      const saw =
+        this.secretions > 0
+          ? this.secretions * (((t * SECRETION_SAW.hz) % 1) * 2 - 1) * Math.min(1, Math.abs(flow) / 0.3)
+          : 0;
       this.outSamples.push(
         t,
-        n ? paw + SIGNAL_NOISE.paw * n() : paw,
-        n ? flow + SIGNAL_NOISE.flow * n() : flow,
+        (n ? paw + SIGNAL_NOISE.paw * n() : paw) + saw * SECRETION_SAW.paw,
+        (n ? measured + SIGNAL_NOISE.flow * n() : measured) + saw * SECRETION_SAW.flow,
         this.displayVolume,
         palv,
         pmus,
@@ -377,7 +399,23 @@ export class Simulator {
     this.updateCardiac();
     this.watchEffort(t, pmus, paw);
 
-    this.transition(t, flow, paw);
+    this.transition(t, measured, paw);
+  }
+
+  /** Gas leaving the alveoli through a bronchopleural fistula (L/s). */
+  private fistulaFlow(t: number, v: number): number {
+    if (this.fistulaLeak <= 0) return 0;
+    const palv = this.lung.alveolarPressure(v, this.effort.pmus(t) - this.pexp - this.pcard);
+    return this.fistulaLeak * Math.max(0, palv);
+  }
+
+  /** Of the ventilator's flow, what passes the cuff into the lungs (the rest leaks out). */
+  private pastCuff(ventFlow: number, v: number, pmus: number): number {
+    const g = this.cuffLeak;
+    if (g <= 0) return ventFlow;
+    // Vent flow = lung flow + g·Paw, with Paw = Palv + R_insp·lung flow.
+    const palv = this.lung.alveolarPressure(v, pmus);
+    return (ventFlow - g * Math.max(0, palv)) / (1 + g * this.lung.mechanics.rInsp);
   }
 
   /** Elastic recoil pressure (cmH2O): alveolar pressure with no effort. */
@@ -424,7 +462,11 @@ export class Simulator {
     }
     const tIn = t - this.phaseStart;
     const net = this.effort.pmus(t) - this.pexp - this.pcard;
-    const need = Math.max(0, this.lung.flow(this.pressureTarget(b), this.volume, net));
+    const target = this.pressureTarget(b);
+    const lungNeed = Math.max(0, this.lung.flow(target, this.volume, net));
+    // A pressure breath makes up for a cuff leak: deliver the leak at the target as well.
+    const need =
+      lungNeed * (1 + this.cuffLeak * this.lung.mechanics.rInsp) + this.cuffLeak * target;
     const cap = SERVO_MAX_FLOW * Math.min(1, tIn / Math.max(b.riseTime, SERVO_MIN_RISE));
     const command = Math.min(need, cap);
     const w = SERVO_NATURAL_FREQ;
@@ -442,15 +484,22 @@ export class Simulator {
     const pmus = this.effort.pmus(t) - this.pexp - this.pcard;
     switch (control.kind) {
       case "flow":
-        return control.q(t);
+        return this.pastCuff(control.q(t), v, pmus);
       case "pressure":
         return this.lung.flow(control.paw(t), v, pmus);
-      case "servo":
-        return this.lung.pressureForFlow(control.q, v, pmus) > control.relief
+      case "servo": {
+        const q = this.pastCuff(control.q, v, pmus);
+        return this.lung.pressureForFlow(q, v, pmus) > control.relief
           ? this.lung.flow(control.relief, v, pmus)
-          : control.q;
-      case "closed":
-        return 0;
+          : q;
+      }
+      case "closed": {
+        // Valves shut: with a cuff leak, gas still escapes around the tube (falling plateau).
+        const g = this.cuffLeak;
+        if (g <= 0) return 0;
+        const palv = this.lung.alveolarPressure(v, pmus);
+        return (-g * Math.max(0, palv)) / (1 + g * this.lung.expiratoryResistance(v));
+      }
       case "expiratory": {
         const q = this.expiratoryFlow(control.peep, v, pmus, t);
         if (q <= 0) return q;
@@ -468,7 +517,7 @@ export class Simulator {
       case "servo":
         return Math.min(this.lung.pressureForFlow(flow, v, pmus), control.relief);
       case "closed":
-        return this.lung.alveolarPressure(v, pmus);
+        return this.lung.pressureForFlow(flow, v, pmus);
       case "expiratory":
         // A one-way expiratory valve with no inflow source: airway pressure follows the alveoli.
         if (flow === 0 && control.oneWay) return this.lung.alveolarPressure(v, pmus);
@@ -830,6 +879,8 @@ export class Simulator {
       highPressureCycled: false,
       cycle: "time",
       asynchronies: [],
+      lungVti: 0,
+      lungVte: 0,
       maxPullPmus: 0,
       minInspPaw: Infinity,
       siT: [],
@@ -906,6 +957,8 @@ export class Simulator {
           : null,
       endExpRecruited: this.lung.recruited,
       asynchronies: a.asynchronies,
+      lungVti: a.lungVti,
+      lungVte: a.lungVte,
     });
     this.acc = null;
   }

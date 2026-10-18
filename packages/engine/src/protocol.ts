@@ -7,10 +7,11 @@ import type { PatientFeatures, SedationLevel } from "./drive";
 import type { BloodGas, GasParams } from "./gas";
 import type { BreathMetrics } from "./monitor";
 import type { ProfileId } from "./profiles";
+import type { ScenarioEvent, ScenarioEventKind } from "./scenario";
 import type { Drive, EngineEvent, Mechanics, VentSettings } from "./types";
 import type { CirculationParams, Vitals } from "./vitals";
 
-export const ENGINE_CONTRACT_VERSION = 5;
+export const ENGINE_CONTRACT_VERSION = 6;
 
 /** Instructor Panel changes; each field is merged into the running patient. */
 export interface ProfilePatch {
@@ -33,6 +34,10 @@ export type EngineCommand =
   | { type: "setProfileParam"; patch: ProfilePatch }
   | { type: "setSedation"; level: SedationLevel }
   | { type: "setPatientFeatures"; features: Partial<PatientFeatures> }
+  /** Scenario Events (M13): start `delay` s from now; optionally treated `resolveAfter` s later. */
+  | { type: "scheduleEvent"; kind: ScenarioEventKind; delay: number; resolveAfter?: number | null }
+  | { type: "resolveEvent"; id: number }
+  | { type: "cancelEvent"; id: number }
   | { type: "inspiratoryPause" }
   | { type: "expiratoryHold" }
   | { type: "endApneaBackup" }
@@ -59,6 +64,10 @@ export interface EngineState {
   alarmLimits: AlarmLimits;
   paused: boolean;
   fastForward: number;
+  /** Scenario Events on the timeline (session time, s). */
+  scenario: ScenarioEvent[];
+  /** Session time when this state was posted (s). */
+  time: number;
 }
 
 export type EngineMessage =

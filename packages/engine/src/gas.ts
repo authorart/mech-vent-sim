@@ -112,11 +112,11 @@ export class GasExchange {
     this.alveolarVolumes.push({
       start: b.startTime,
       t: b.endTime,
-      v: alveolar(b.vte),
-      vInspired: alveolar(b.vti),
+      v: alveolar(b.lungVte),
+      vInspired: alveolar(b.lungVti),
     });
     this.lastBreathEnd = b.endTime;
-    this.lastTidalVolume = b.vte;
+    this.lastTidalVolume = b.lungVte;
   }
 
   /**

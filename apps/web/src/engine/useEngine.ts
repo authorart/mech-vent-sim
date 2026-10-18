@@ -8,6 +8,7 @@ import {
   INITIAL_SETTINGS,
   PROFILES,
   type CaseState,
+  type EngineCommand,
   type ProfileId,
 } from "@mech-vent/engine";
 import { useEffect } from "react";
@@ -44,6 +45,7 @@ export function currentCase(): CaseState | null {
     heightCm,
     patch: diffFromProfile(engine.profileId, engine),
     features: engine.features,
+    events: engine.scenario.map((e) => ({ kind: e.kind, at: e.at, resolvedAt: e.resolvedAt })),
   };
 }
 
@@ -59,8 +61,21 @@ function isUntouchedDefault(c: CaseState, defaultProfile: ProfileId): boolean {
     c.sedation === PROFILES[defaultProfile].startSedation &&
     Object.keys(c.patch).length === 0 &&
     JSON.stringify(c.features ?? DEFAULT_FEATURES) === JSON.stringify(DEFAULT_FEATURES) &&
+    (c.events ?? []).length === 0 &&
     JSON.stringify(c.settings) === JSON.stringify(INITIAL_SETTINGS)
   );
+}
+
+/** Replay a case's scenario timeline from now (the case was just loaded, at time 0). */
+function scheduleCaseEvents(c: CaseState, send: (cmd: EngineCommand) => void): void {
+  for (const e of c.events ?? []) {
+    send({
+      type: "scheduleEvent",
+      kind: e.kind,
+      delay: e.at,
+      resolveAfter: e.resolvedAt === null ? null : e.resolvedAt - e.at,
+    });
+  }
 }
 
 /** Load a case into the running Engine (used by "Resume last case"). */
@@ -70,6 +85,7 @@ export function loadCase(c: CaseState): void {
   send({ type: "loadProfile", profileId: c.profileId, settings: c.settings });
   send({ type: "setSedation", level: c.sedation });
   send({ type: "setPatientFeatures", features: c.features ?? DEFAULT_FEATURES });
+  scheduleCaseEvents(c, send);
   if (Object.keys(c.patch).length > 0) send({ type: "setProfileParam", patch: c.patch });
 }
 
@@ -91,6 +107,7 @@ export function useEngine(defaultProfile: ProfileId): void {
         client.send({ type: "setProfileParam", patch: linked.patch });
       }
       if (linked.features) client.send({ type: "setPatientFeatures", features: linked.features });
+      scheduleCaseEvents(linked, (cmd) => client.send(cmd));
     } else {
       client.init(defaultProfile);
       const saved = savedCase();

@@ -87,10 +87,10 @@ export class EngineHost {
         break;
       case "setProfileParam": {
         const { mechanics, drive, gas, circulation } = cmd.patch;
-        if (mechanics) s.sim.setPatient({ mechanics: { ...s.sim.lung.mechanics, ...mechanics } });
+        if (mechanics) s.setMechanics(mechanics);
         if (drive) s.baseDrive = { ...s.baseDrive, ...drive };
-        if (gas) s.gas.params = { ...s.gas.params, ...gas };
-        if (circulation) s.circulation.params = { ...s.circulation.params, ...circulation };
+        if (gas) s.setGas(gas);
+        if (circulation) s.setCirculation(circulation);
         break;
       }
       case "setSedation":
@@ -98,6 +98,15 @@ export class EngineHost {
         break;
       case "setPatientFeatures":
         s.setFeatures(cmd.features);
+        break;
+      case "scheduleEvent":
+        s.scheduleEvent(cmd.kind, cmd.delay, cmd.resolveAfter ?? null);
+        break;
+      case "resolveEvent":
+        s.resolveEvent(cmd.id);
+        break;
+      case "cancelEvent":
+        s.cancelEvent(cmd.id);
         break;
       case "inspiratoryPause":
         s.sim.inspiratoryPause();
@@ -152,10 +161,12 @@ export class EngineHost {
       sedation: s.sedation,
       features: { ...s.features },
       appliedDrive: s.appliedDrive,
-      mechanics: { ...s.sim.lung.mechanics },
+      mechanics: { ...s.baseMechanics },
       baseDrive: { ...s.baseDrive },
-      gas: { ...s.gas.params },
-      circulation: { ...s.circulation.params },
+      gas: { ...s.baseGas },
+      circulation: { ...s.baseCirculation },
+      scenario: s.scenario.events.map((e) => ({ ...e })),
+      time: s.sim.time,
       alarmLimits: { ...s.alarms.limits },
       paused: this.paused,
       fastForward: s.gasTimeScale,

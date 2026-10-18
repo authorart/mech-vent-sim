@@ -88,4 +88,15 @@ export {
   type ProfilePatch,
 } from "./protocol";
 export { EngineHost, MAX_TICK, type Post } from "./host";
-export { decodeCase, encodeCase, diffFromProfile, type CaseState } from "./case";
+export {
+  ScenarioTimeline,
+  SCENARIO_KINDS,
+  SCENARIO_TIMING,
+  AWAKE_AFTER,
+  progression,
+  scenarioEffects,
+  type ScenarioEvent,
+  type ScenarioEventKind,
+  type ScenarioEffects,
+} from "./scenario";
+export { decodeCase, encodeCase, diffFromProfile, type CaseEvent, type CaseState } from "./case";

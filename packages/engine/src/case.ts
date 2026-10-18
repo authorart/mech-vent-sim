@@ -2,6 +2,7 @@ import { DEFAULT_FEATURES, type PatientFeatures, type SedationLevel } from "./dr
 import type { GasParams } from "./gas";
 import { PROFILES, type ProfileId, type Sex } from "./profiles";
 import type { ProfilePatch } from "./protocol";
+import { SCENARIO_KINDS, type ScenarioEventKind } from "./scenario";
 import type { Drive, Mechanics, Mode, VentSettings } from "./types";
 import type { CirculationParams } from "./vitals";
 
@@ -21,6 +22,14 @@ export interface CaseState {
   patch: ProfilePatch;
   /** How the patient breathes (M9). Older links without it use the defaults. */
   features?: PatientFeatures;
+  /** Scenario timeline (M13), in seconds from when the case is loaded. */
+  events?: CaseEvent[];
+}
+
+export interface CaseEvent {
+  kind: ScenarioEventKind;
+  at: number;
+  resolvedAt: number | null;
 }
 
 const MODES: Mode[] = ["VCV", "PCV", "PSV"];
@@ -119,7 +128,25 @@ export function decodeCase(encoded: string): CaseState | null {
     heightCm: isNum(raw.heightCm) ? Math.min(220, Math.max(120, raw.heightCm)) : 170,
     patch,
     features: decodeFeatures(raw.features),
+    events: decodeEvents(raw.events),
   };
+}
+
+const MAX_EVENTS = 20;
+
+function decodeEvents(list: unknown): CaseEvent[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter(
+      (e): e is CaseEvent =>
+        isObj(e) &&
+        SCENARIO_KINDS.includes(e.kind as ScenarioEventKind) &&
+        isNum(e.at) &&
+        e.at >= 0 &&
+        (e.resolvedAt === null || (isNum(e.resolvedAt) && e.resolvedAt >= e.at)),
+    )
+    .slice(0, MAX_EVENTS)
+    .map((e) => ({ kind: e.kind, at: e.at, resolvedAt: e.resolvedAt }));
 }
 
 function decodeFeatures(f: unknown): PatientFeatures {

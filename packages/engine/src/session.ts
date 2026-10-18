@@ -15,8 +15,9 @@ import { Monitor, type BreathMetrics } from "./monitor";
 import { Simulator, type SimulatorOptions } from "./simulator";
 import { PROFILES, type ProfileId } from "./profiles";
 import { INITIAL_SETTINGS } from "./settings";
-import type { BreathRecord, Drive, EngineEvent, VentSettings } from "./types";
+import type { BreathRecord, Drive, EngineEvent, Mechanics, VentSettings } from "./types";
 import { Circulation, type CirculationParams, type Vitals } from "./vitals";
+import { AWAKE_AFTER, ScenarioTimeline, type ScenarioEventKind } from "./scenario";
 
 export interface SessionStep {
   samples: Float32Array;
@@ -58,6 +59,9 @@ export const NORMAL_GAS: GasParams = {
 
 export const NORMAL_CIRCULATION: CirculationParams = { hr: 80, sbp: 120, dbp: 75 };
 
+/** Longest step taken at once while Scenario Events are on the timeline (s). */
+export const SCENARIO_CHUNK = 0.1;
+
 /** Gas and vitals start reporting once this much time has passed, already at steady state. */
 export const PHYSIOLOGY_PRIME_TIME = 10;
 
@@ -78,6 +82,17 @@ export class Session {
   referencePh: number;
   features: PatientFeatures;
   readonly seed: number;
+
+  /**
+   * The patient before Scenario Events (profile + Instructor Panel changes). Each step the
+   * active events are applied on top of these (M13).
+   */
+  baseMechanics: Mechanics;
+  baseGas: GasParams;
+  baseCirculation: CirculationParams;
+  readonly scenario = new ScenarioTimeline();
+  /** Discrete scenario changes already applied (`id:what`). */
+  private fired = new Set<string>();
 
   private latest: BreathMetrics | null = null;
   private latestRecord: BreathRecord | null = null;
@@ -100,8 +115,98 @@ export class Session {
     });
     this.applyFeatures();
     this.alarms = new AlarmEngine(opts.alarmLimits);
-    this.gas = new GasExchange({ ...(opts.gas ?? NORMAL_GAS) });
-    this.circulation = new Circulation({ ...(opts.circulation ?? NORMAL_CIRCULATION) });
+    this.baseMechanics = { ...opts.patient.mechanics };
+    this.baseGas = { ...(opts.gas ?? NORMAL_GAS) };
+    this.baseCirculation = { ...(opts.circulation ?? NORMAL_CIRCULATION) };
+    this.gas = new GasExchange({ ...this.baseGas });
+    this.circulation = new Circulation({ ...this.baseCirculation });
+  }
+
+  /** Instructor Panel changes to the patient's baseline (scenario effects stay on top). */
+  setMechanics(patch: Partial<Mechanics>): void {
+    this.baseMechanics = { ...this.baseMechanics, ...patch };
+    this.applyScenario(this.sim.time);
+  }
+
+  setGas(patch: Partial<GasParams>): void {
+    this.baseGas = { ...this.baseGas, ...patch };
+    this.applyScenario(this.sim.time);
+  }
+
+  setCirculation(patch: Partial<CirculationParams>): void {
+    this.baseCirculation = { ...this.baseCirculation, ...patch };
+    this.applyScenario(this.sim.time);
+  }
+
+  /** Add a Scenario Event `delay` s from now; optionally treated `resolveAfter` s after it starts. */
+  scheduleEvent(kind: ScenarioEventKind, delay = 0, resolveAfter: number | null = null) {
+    const at = this.sim.time + Math.max(0, delay);
+    return this.scenario.schedule(kind, at, resolveAfter === null ? null : at + resolveAfter);
+  }
+
+  resolveEvent(id: number): void {
+    this.scenario.resolve(id, this.sim.time);
+  }
+
+  cancelEvent(id: number): void {
+    this.scenario.cancel(id);
+    this.applyScenario(this.sim.time);
+  }
+
+  /**
+   * Apply the timeline at time t: continuous effects on the patient, plus the one-off changes
+   * (agitation, sedation wearing off) when their moment passes. Returns start/resolve events.
+   */
+  private applyScenario(t: number): EngineEvent[] {
+    const out: EngineEvent[] = [];
+    for (const e of this.scenario.events) {
+      const once = (what: string, when: number, action: () => void) => {
+        const key = `${e.id}:${what}`;
+        if (t < when || this.fired.has(key)) return;
+        this.fired.add(key);
+        action();
+      };
+      once("start", e.at, () => {
+        out.push({ type: "scenario", t: e.at, id: e.id, kind: e.kind, phase: "started" });
+        if (e.kind === "agitation") this.setFeatures({ agitation: "severe" });
+        if (e.kind === "sedationWearsOff") this.setSedation("light");
+      });
+      if (e.kind === "sedationWearsOff" && (e.resolvedAt === null || e.resolvedAt > e.at + AWAKE_AFTER)) {
+        once("awake", e.at + AWAKE_AFTER, () => this.setSedation("awake"));
+      }
+      if (e.resolvedAt !== null) {
+        once("resolved", e.resolvedAt, () => {
+          out.push({ type: "scenario", t: e.resolvedAt!, id: e.id, kind: e.kind, phase: "resolved" });
+          if (e.kind === "agitation") this.setFeatures({ agitation: "none" });
+          if (e.kind === "sedationWearsOff") this.setSedation("deep");
+        });
+      }
+    }
+
+    const fx = this.scenario.effects(t);
+    const m = this.baseMechanics;
+    this.sim.setPatient({
+      mechanics: {
+        ...m,
+        compliance: m.compliance * fx.complianceFactor,
+        rInsp: m.rInsp * fx.resistanceFactor,
+        rExp: m.rExp * fx.resistanceFactor,
+      },
+    });
+    this.sim.cuffLeak = fx.cuffLeak;
+    this.sim.fistulaLeak = fx.fistulaLeak;
+    this.sim.secretions = fx.secretions;
+    this.gas.params = {
+      ...this.baseGas,
+      shuntMax: Math.min(0.95, this.baseGas.shuntMax + fx.shuntAdd),
+    };
+    const c = this.baseCirculation;
+    this.circulation.params = {
+      hr: c.hr + fx.hrAdd,
+      sbp: c.sbp * fx.bpFactor,
+      dbp: c.dbp * fx.bpFactor,
+    };
+    return out;
   }
 
   get latestMetrics(): BreathMetrics | null {
@@ -145,9 +250,33 @@ export class Session {
   }
 
   advance(seconds: number): SessionStep {
+    // With Scenario Events, step in short chunks so their effects follow time smoothly.
+    if (this.scenario.events.length === 0 || seconds <= SCENARIO_CHUNK) return this.advanceChunk(seconds);
+    const steps: SessionStep[] = [];
+    for (let done = 0; done < seconds - 1e-9; done += SCENARIO_CHUNK) {
+      steps.push(this.advanceChunk(Math.min(SCENARIO_CHUNK, seconds - done)));
+    }
+    const samples = new Float32Array(steps.reduce((n, x) => n + x.samples.length, 0));
+    let offset = 0;
+    for (const x of steps) {
+      samples.set(x.samples, offset);
+      offset += x.samples.length;
+    }
+    return {
+      samples,
+      metrics: steps.flatMap((x) => x.metrics),
+      events: steps.flatMap((x) => x.events),
+      alarms: steps.flatMap((x) => x.alarms),
+      physiology: steps.map((x) => x.physiology).filter((x) => x !== null).at(-1) ?? null,
+    };
+  }
+
+  private advanceChunk(seconds: number): SessionStep {
+    const scenarioEvents = this.applyScenario(this.sim.time);
     this.updateDrive();
     this.sim.heartRate = this.circulation.state?.hr ?? this.circulation.params.hr;
     const r = this.sim.advance(seconds);
+    r.events.unshift(...scenarioEvents);
     const alarms: AlarmEvent[] = [];
     const metrics: BreathMetrics[] = [];
 

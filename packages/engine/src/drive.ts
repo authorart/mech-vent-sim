@@ -34,13 +34,19 @@ export const DEFAULT_FEATURES: PatientFeatures = {
   cardiacOscillation: "small",
 };
 
-/** Agitation multiplies Muscle Pressure, neural rate and the variability coefficients. */
-export const AGITATION_EFFECT: Record<Agitation, { pmus: number; rate: number; variability: number }> =
-  {
-    none: { pmus: 1, rate: 1, variability: 1 },
-    moderate: { pmus: 1.5, rate: 1.3, variability: 1.5 },
-    severe: { pmus: 2, rate: 1.6, variability: 2 },
-  };
+/**
+ * Agitation multiplies Muscle Pressure, neural rate and the variability coefficients. Like
+ * wakefulness, it is a behavioral drive: it raises the floor under the chemoreflex, so
+ * blowing off CO2 doesn't calm an agitated patient.
+ */
+export const AGITATION_EFFECT: Record<
+  Agitation,
+  { pmus: number; rate: number; variability: number; floor: number }
+> = {
+  none: { pmus: 1, rate: 1, variability: 1, floor: 0 },
+  moderate: { pmus: 1.5, rate: 1.3, variability: 1.5, floor: 0.3 },
+  severe: { pmus: 2, rate: 1.6, variability: 2, floor: 0.6 },
+};
 
 /** Fraction of the profile's Muscle Pressure available at each sedation level. */
 export const SEDATION_FACTOR: Record<SedationLevel, number> = { deep: 0, light: 0.5, awake: 1 };
@@ -74,8 +80,9 @@ export function effectiveDrive(
   agitation: Agitation = "none",
 ): Drive {
   const s = SEDATION_FACTOR[sedation];
-  const multiplier = Math.max(chemo, WAKEFULNESS_FLOOR[sedation]);
   const a = AGITATION_EFFECT[agitation];
+  const floor = WAKEFULNESS_FLOOR[sedation] + (WAKEFULNESS_FLOOR[sedation] > 0 ? a.floor : 0);
+  const multiplier = Math.max(chemo, floor);
   if (s === 0 || multiplier === 0 || base.neuralRate === 0) {
     return { ...base, neuralRate: 0, pmusMax: 0 };
   }

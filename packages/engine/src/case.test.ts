@@ -17,6 +17,7 @@ const base: CaseState = {
     reverseTriggering: true,
     cardiacOscillation: "strong",
   },
+  events: [],
 };
 
 describe("Case links", () => {
