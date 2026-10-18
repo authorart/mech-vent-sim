@@ -3,7 +3,7 @@
 Source specs: [simulation-engine.md](./simulation-engine.md) (the Engine spec) · [Recommended-Simulator-Architecture.md](./Recommended-Simulator-Architecture.md) (stack)
 Domain language: [GLOSSARY.md](./GLOSSARY.md) · Decisions: [docs/adr/](./docs/adr/)
 
-**Status:** ✅ V1 prototype complete 2026-10-17. Live at https://mech-vent-sim.vercel.app. V1 backed up 2026-10-18 (tag `v1.1.0`, branch `v1-backup`, zip `../mech-vent-v1.1.0-backup.zip`). **V1.2 fixes done** (see below). Next: **V2** (Round 6 agreed): **V2 complete** (M9–M15). Waiting for your clinical review of [docs/clinical-review-v2.md](docs/clinical-review-v2.md). Repo: https://github.com/authorart/mech-vent-sim
+**Status:** ✅ V1 prototype complete 2026-10-17. Live at https://mech-vent-sim.vercel.app. V1 backed up 2026-10-18 (tag `v1.1.0`, branch `v1-backup`, zip `../mech-vent-v1.1.0-backup.zip`). **V1.2 fixes done** (see below). Next: **V2** (Round 6 agreed): **V2 complete** (M9–M15). Waiting for your clinical review of [docs/clinical-review-v2.md](docs/clinical-review-v2.md). **Next: V2.1, V-SIMV and P-SIMV** (Round 7 agreed; V2 backed up as tag `v2.0.0`, branch `v2-backup`, zip `../mech-vent-v2.0.0-backup.zip`). Repo: https://github.com/authorart/mech-vent-sim
 
 ---
 
@@ -221,8 +221,31 @@ Each milestone ends with tests passing, the V1 profile signatures re-checked, an
 - [x] **M14 Disease behavior**: Neuromuscular and stiff-chest-wall ARDS profiles · per-profile hemodynamics and pulse pressure variation · Targets card and "Apply recommended start" · stress index and dynamic compliance trend for a decremental PEEP trial _Done 2026-10-18: 155 engine tests (19 new in `disease.test.ts`). **New profiles** (10 in all): *Neuromuscular weakness* (normal lungs, P_mus 2.5, neural rate 18, opens awake; weak efforts trigger a 2 L/min flow trigger but not a 2 cmH2O pressure trigger; larger Vt gives hypocapnia, as ch. 22 warns) and *ARDS with stiff chest wall* (C_rs 15, chest wall 40 mL/cmH2O, resting Pes 10, recruitment closing 16 / opening 40; on its start of PEEP 16 the end-expiratory Pes ≈ PEEP, plateau ~37 but end-inspiratory transpulmonary pressure < 25, ch. 31 fig. 31-13). **Hemodynamics**: preload sensitivity per profile (PE 1.5, metabolic acidosis 1.3, cardiogenic edema −0.5, others 1): PEEP 5 → 15 keeps BP in heart failure but drops it ~14 mmHg in massive PE. **PPV** (passive breaths only): ≈ 2.2 × pleural swing × preload sensitivity → normal ~5%, PE ~8%; shown in the vitals. **Esophageal values** on every breath (Pes and transpulmonary pressure at end inspiration/expiration). **Targets** (`targets.ts`, from the table above): evaluated live (✓ / ↑ / ↓ with words for screen readers) with short notes and chapter references; Instructor Panel shows them, "Show to learners" adds the card under the gas panel; "Apply recommended start" sets volume control from the targets for the current PBW (Ti via flow; asthma limit 60, stiff chest wall 50). Every profile's recommended start keeps transpulmonary pressure in target without cutting breaths short. **Numbers**: C dyn and stress index (with "tidal recruitment / linear / overdistension"). **PEEP trial** table in the Instructor Panel: mean C dyn of the last 8 mandatory breaths per PEEP, best marked, "set PEEP best + 2". ⚠ For your review: the two new profiles' values, preload sensitivities, the PPV formula, and the targets/starting values (FiO2 start 0.4 for COPD, apnea, neuromuscular)_
 - [x] **M15 Displays and ship**: optional 4th trace (esophageal/transpulmonary pressure or capnogram) · loops and numbers for the new values · phone and desktop check · your clinical review of the new numbers · deploy _Done 2026-10-18: 158 engine tests (3 new in `capnogram.test.ts`). **Capnogram** channel (contract v7): zero on inspiration and phase I (anatomic dead space), steep phase II (25 mL), phase III plateau whose slope rises with expiratory resistance (normal flat, COPD/asthma "shark fin", ch. 28 fig. 28-3/28-4). **4th trace** selector on the waveform view (none / esophageal pressure / CO2), color #C25A9E validated with the three trace colors (dataviz validator: all checks pass on the dark surface). With the Pes trace on, the numbers add end-expiratory and end-inspiratory Pes and transpulmonary pressure. **Checks**: desktop 1440 px (COPD capnogram, stiff-chest-wall ARDS with Pes) and phone 390 px (page stays 390 px wide with the 4th trace and the Asynchrony guide; the waveform header now wraps) on the live site. **Clinical review**: every V2 value collected in [docs/clinical-review-v2.md](docs/clinical-review-v2.md) for you to mark OK or change. Deployed_
 
+---
+
+## V2.1: V-SIMV and P-SIMV (planned 2026-10-18, in progress)
+
+**Source:** Hess & Kacmarek ch. 6 (traditional modes, table 6-1, fig. 6-6 to 6-8), ch. 15 (mode asynchrony, fig. 15-10). SIMV gives mandatory breaths (volume- or pressure-controlled) at a set rate, synchronized with the patient's effort through an assist window; between them the patient breathes spontaneously, usually with pressure support. The book's teaching point: at low SIMV rates the patient often works as hard during the mandatory breaths as during the spontaneous ones, so SIMV doesn't really share the work.
+
+### Round 7: agreed 2026-10-18 ("Agree all")
+
+| # | Question | My recommendation |
+| --- | --- | --- |
+| R7-Q1 | Mode names on the buttons | **V-SIMV** and **P-SIMV** (your names), next to VCV / PCV / PSV. The glossary notes the book's names VC-SIMV and PC-SIMV |
+| R7-Q2 | Spontaneous breaths between mandatory ones | **Pressure support** with its own PS knob (default **5 cmH2O**, 0–30; 0 = CPAP), using the same rise time and Esens rules as PSV |
+| R7-Q3 | How the mandatory breath is synchronized (assist window) | Each SIMV cycle (60 ÷ SIMV rate) starts with an **assist window of 25% of the cycle**: the first patient trigger in the window gets the mandatory breath; if none comes, the mandatory breath is delivered when the window closes. The rest of the cycle is spontaneous (pressure support) |
+| R7-Q4 | Mandatory breath settings | V-SIMV: Vt, SIMV rate, peak flow, flow pattern, pause (as VCV). P-SIMV: P insp, SIMV rate, Ti, rise time (as PCV). Plus PS, Esens, PEEP, FiO2, trigger, pressure limit |
+| R7-Q5 | Starting values when switching mode | Carry over from the current mode (Vt / flow or P insp / Ti, PEEP, FiO2, trigger, limit); **SIMV rate starts at 10** (partial support), PS 5 |
+| R7-Q6 | Apnea | No Apnea Backup needed: the SIMV rate guarantees the mandatory breaths. The usual alarms (low V̇E, low Vte) still apply |
+| R7-Q7 | What the monitor shows | RR split into **mandatory / spontaneous**, Vte of each type, and each breath marked mandatory or spontaneous (asynchrony classifier and loops keep working) |
+| R7-Q8 | Teaching extras | Add **Mode asynchrony** to the Asynchrony guide: one card showing the patient's effort (esophageal pressure trace) nearly the same on mandatory and spontaneous breaths at a low SIMV rate (fig. 15-10), with the book's fixes (enough support, or another mode) |
+
+### V2.1 milestone (proposed)
+
+- [ ] **M16 SIMV**: engine (assist window, mandatory VCV/PCV breaths, pressure-supported spontaneous breaths, breath type on every record) · settings dialog and knobs for both modes · monitor split by breath type · case links · Mode asynchrony card in the guide · tests (assist window timing, set rate guaranteed with no effort, PS breaths between, rate split, mode asynchrony effort similar on both breath types) · phone/desktop check · deploy
+
 ### Later (not in V2)
 
-SIMV and adaptive modes (mode asynchrony, PRVC/volume support) · PSV periodic breathing with sleep · two-compartment lung · seeded random profile values · accounts and saved Scenarios · Thai localization
+Adaptive modes (PRVC/volume support) · PSV periodic breathing with sleep · two-compartment lung · seeded random profile values · accounts and saved Scenarios · Thai localization
 
 _Deferred by you (R5-3): the LLM layer (Scenario generation, instructor feedback, debrief). ADR-0001 still applies if it returns._
