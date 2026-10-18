@@ -149,6 +149,7 @@ interface BreathAccumulator {
   asynchronies: AsynchronyKind[];
   lungVti: number;
   lungVte: number;
+  pesEndInsp: number;
   /** Largest Muscle Pressure during inspiration, and lowest airway pressure after 0.1 s. */
   maxPullPmus: number;
   minInspPaw: number;
@@ -805,6 +806,7 @@ export class Simulator {
       this.acc.cycle = cycle;
       this.acc.cycleFlow = flow;
       this.acc.endInspRecoil = this.recoil;
+      this.acc.pesEndInsp = this.lung.pleuralPressure(this.volume, 0);
       this.acc.endInspPaw = this.lastPaw;
     }
     const pause = this.inspPauseRequested ? Math.max(HOLD_TIME, setPause) : setPause;
@@ -881,6 +883,7 @@ export class Simulator {
       asynchronies: [],
       lungVti: 0,
       lungVte: 0,
+      pesEndInsp: this.lung.pleuralPressure(this.volume, 0),
       maxPullPmus: 0,
       minInspPaw: Infinity,
       siT: [],
@@ -959,6 +962,8 @@ export class Simulator {
       asynchronies: a.asynchronies,
       lungVti: a.lungVti,
       lungVte: a.lungVte,
+      pesEndInsp: a.pesEndInsp,
+      pesEndExp: this.lung.pleuralPressure(this.volume, 0),
     });
     this.acc = null;
   }

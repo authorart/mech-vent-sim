@@ -22,6 +22,25 @@ export const en = {
   asynchronyIndexHint:
     "Asynchrony events ÷ (breaths + ineffective efforts) over the last 2 minutes. Above 10% is usually called frequent.",
   asynchronyRecent: "Recent",
+  targetsHeading: "Targets",
+  targetsHint:
+    "Goals for this patient from the book's management chapters, checked against the current values. Hidden from learners until you show them.",
+  showTargets: "Show to learners",
+  applyStart: "Apply recommended start",
+  applyStartHint: "Volume control with this patient's starting targets for the current height (PBW). Takes effect at the next breath.",
+  targetMeasure: "Measure",
+  targetNow: "Now",
+  targetGoal: "Target",
+  targetStatus: "Status",
+  targetStatusWord: { ok: "in range", low: "below range", high: "above range", unknown: "no value yet" },
+  peepTrialHeading: "PEEP trial",
+  peepTrialHint:
+    "Collects dynamic compliance at each PEEP you set (mandatory breaths only). For a decremental trial: recruit, then step PEEP down every few minutes.",
+  peepTrialNone: "Change PEEP to start collecting.",
+  peepTrialBest: "Best compliance at PEEP {peep}. The book's rule: set PEEP {suggest} (best + 2).",
+  peepTrialReset: "Clear",
+  stressIndexHint: { low: "tidal recruitment", ok: "linear", high: "overdistension" },
+  ppvHint: "passive breaths only",
   scenarioHeading: "Scenario events",
   scenarioHint:
     "Things that happen to the patient during the case. Learners see only the effects on the waveforms, numbers and alarms.",

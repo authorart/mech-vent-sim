@@ -178,6 +178,12 @@ export interface BreathRecord {
    */
   lungVti: number;
   lungVte: number;
+  /**
+   * Esophageal pressure at end inspiration and end expiration (cmH2O), as an esophageal balloon
+   * would read them with no effort (M14). Alveolar minus esophageal = transpulmonary pressure.
+   */
+  pesEndInsp: number;
+  pesEndExp: number;
 }
 
 export type EngineEvent =

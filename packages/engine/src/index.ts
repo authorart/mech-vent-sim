@@ -89,6 +89,17 @@ export {
 } from "./protocol";
 export { EngineHost, MAX_TICK, type Post } from "./host";
 export {
+  TARGETS,
+  recommendedStart,
+  evaluateTargets,
+  type DiseaseTargets,
+  type Range,
+  type TargetInputs,
+  type TargetKey,
+  type TargetRow,
+  type TargetStatus,
+} from "./targets";
+export {
   ScenarioTimeline,
   SCENARIO_KINDS,
   SCENARIO_TIMING,

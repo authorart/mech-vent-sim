@@ -10,6 +10,7 @@ import { ResumePrompt } from "./ResumePrompt";
 import { Loops } from "./Loops";
 import { GasPanel, Numerics } from "./Numerics";
 import { SettingsStrip } from "./SettingsStrip";
+import { TargetsCard } from "./TargetsCard";
 import { TopBar } from "./TopBar";
 import { Waveforms } from "./Waveforms";
 
@@ -19,6 +20,7 @@ export function VentilatorApp() {
   const error = useStore((s) => s.error);
   const backup = useStore((s) => s.engine?.apneaBackupActive);
   const paused = useStore((s) => s.engine?.paused);
+  const showTargets = useStore((s) => s.showTargets);
   const [view, setView] = useState<"waveforms" | "loops">("waveforms");
   const [frozen, setFrozen] = useState(false);
   const [instructor, setInstructor] = useState(false);
@@ -100,6 +102,12 @@ export function VentilatorApp() {
           <div className="border-t border-edge pt-4">
             <GasPanel />
           </div>
+          {showTargets && (
+            <div className="border-t border-edge pt-4">
+              <h2 className="mb-2 text-sm font-medium text-ink-2">{m.targetsHeading}</h2>
+              <TargetsCard />
+            </div>
+          )}
         </aside>
       </main>
 

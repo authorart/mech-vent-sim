@@ -43,6 +43,10 @@ interface Store {
   asynchronyLog: AsynchronyMark[];
   /** Draw asynchrony labels on the waveforms (instructor's choice, R6-Q10). */
   showLabels: boolean;
+  /** Show the Targets card to learners (instructor's choice, R6-Q11). */
+  showTargets: boolean;
+  /** Dynamic compliance collected per PEEP for a decremental PEEP trial (M14). */
+  peepTrial: Record<string, { cdyn: number[]; stressIndex: number | null }>;
 
   send: (cmd: EngineCommand) => void;
   setSend: (send: (cmd: EngineCommand) => void) => void;
@@ -61,6 +65,8 @@ export const sweep = new SweepBuffer();
 /** Asynchrony events for the waveform labels (outside React state, like `sweep`). */
 export const asynchronyMarks: AsynchronyMark[] = [];
 const MAX_MARKS = 80;
+/** Breaths averaged per PEEP level in the PEEP trial. */
+const PEEP_TRIAL_BREATHS = 8;
 const LOG_LENGTH = 12;
 
 export const useStore = create<Store>((set, get) => ({
@@ -80,6 +86,8 @@ export const useStore = create<Store>((set, get) => ({
   resumable: null,
   asynchronyLog: [],
   showLabels: false,
+  showTargets: false,
+  peepTrial: {},
 
   send: () => {},
   setSend: (send) => set({ send }),
@@ -105,6 +113,7 @@ export const useStore = create<Store>((set, get) => ({
             alarms: [],
             measuring: null,
             asynchronyLog: [],
+            peepTrial: {},
           });
         }
         set({ engine: msg.state });
@@ -113,9 +122,22 @@ export const useStore = create<Store>((set, get) => ({
       case "samples":
         sweep.push(msg.data);
         return;
-      case "breath":
-        set({ metrics: msg.metrics });
+      case "breath": {
+        const x = msg.metrics;
+        const peep = get().engine?.settings.peep;
+        if (x.cdyn !== null && x.trigger !== "patient" && peep !== undefined) {
+          const key = String(peep);
+          const prev = get().peepTrial[key] ?? { cdyn: [], stressIndex: null };
+          const entry = {
+            cdyn: [...prev.cdyn, x.cdyn].slice(-PEEP_TRIAL_BREATHS),
+            stressIndex: x.stressIndex ?? prev.stressIndex,
+          };
+          set({ metrics: x, peepTrial: { ...get().peepTrial, [key]: entry } });
+        } else {
+          set({ metrics: x });
+        }
         return;
+      }
       case "physiology":
         set({ gas: msg.gas, vitals: msg.vitals });
         return;

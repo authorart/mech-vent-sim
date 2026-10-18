@@ -110,6 +110,18 @@ _Avoid_: waterfall (that's the analogy), air trapping (that's the result)
 Pressure in the lower esophagus, used as the stand-in for pleural pressure. Alveolar pressure minus Pes is the Transpulmonary Pressure that actually stretches the lung.
 _Avoid_: pleural pressure (in the UI), Pes balloon pressure
 
+**Dynamic Compliance (C_dyn)**:
+Exhaled tidal volume divided by (P peak − PEEP), measured every breath without a pause. It includes resistance, so it is lower than static compliance; its trend across PEEP steps guides a decremental PEEP trial.
+_Avoid_: compliance (alone, ambiguous), C_eff
+
+**Pulse Pressure Variation (PPV)**:
+How much the arterial pulse pressure changes over a passive positive-pressure breath, as a percentage. Larger in preload-dependent patients; readable only when the patient isn't breathing actively.
+_Avoid_: SPV (that's systolic pressure variation), fluid responsiveness (that's the conclusion)
+
+**Disease Targets**:
+The goals a Patient Profile is managed toward (tidal volume per kg, rate, Ti, PEEP, plateau and transpulmonary pressure, pH, SpO2), with a recommended starting setting.
+_Avoid_: protocol, normal ranges
+
 **Transpulmonary Pressure**:
 Alveolar pressure minus pleural (esophageal) pressure: the stress on the lung itself, separate from the chest wall.
 _Avoid_: driving pressure (that's P_plat − Total PEEP), P_L (fine as the symbol)

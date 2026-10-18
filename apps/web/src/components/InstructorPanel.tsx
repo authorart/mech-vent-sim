@@ -3,6 +3,7 @@
 import {
   PROFILES,
   progression,
+  recommendedStart,
   SCENARIO_KINDS,
   type ScenarioEventKind,
   type Agitation,
@@ -17,6 +18,7 @@ import { num } from "@/engine/format";
 import { usePbw, useStore } from "@/engine/store";
 import { caseLink, currentCase } from "@/engine/useEngine";
 import { GUIDE_BY_KIND } from "@/guide/asynchrony";
+import { TargetsCard } from "./TargetsCard";
 import { fmt, messages as m } from "@/i18n";
 
 function Slider({
@@ -280,6 +282,10 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
         />
         <p className="text-xs text-ink-3">{m.cardiacHint}</p>
       </Section>
+
+      <TargetsSection />
+
+      <PeepTrialSection />
 
       <ScenarioSection />
 
@@ -599,6 +605,100 @@ function ScenarioSection() {
             );
           })}
         </ol>
+      )}
+    </Section>
+  );
+}
+
+/** Disease targets (M14, R6-Q11/12): shown here always, to learners on request. */
+function TargetsSection() {
+  const engine = useStore((s) => s.engine);
+  const send = useStore((s) => s.send);
+  const showTargets = useStore((s) => s.showTargets);
+  const pbw = usePbw();
+  if (!engine) return null;
+  return (
+    <Section title={m.targetsHeading}>
+      <p className="text-xs text-ink-3">{m.targetsHint}</p>
+      <span className="text-sm text-ink-2">{m.showTargets}</span>
+      <Segmented<"off" | "on">
+        label={m.showTargets}
+        value={showTargets ? "on" : "off"}
+        options={(["off", "on"] as const).map((v) => ({ value: v, label: m.onOff[v] }))}
+        onChange={(v) => useStore.setState({ showTargets: v === "on" })}
+      />
+      <TargetsCard />
+      <button
+        type="button"
+        onClick={() =>
+          send({ type: "applySettings", settings: recommendedStart(engine.profileId, pbw) })
+        }
+        className="self-start rounded bg-pending px-3 py-1.5 text-sm font-medium text-chrome"
+      >
+        {m.applyStart}
+      </button>
+      <p className="text-xs text-ink-3">{m.applyStartHint}</p>
+    </Section>
+  );
+}
+
+/** Dynamic compliance per PEEP for a decremental PEEP trial (M14; ch. 17, table 17-4). */
+function PeepTrialSection() {
+  const trial = useStore((s) => s.peepTrial);
+  const rows = Object.entries(trial)
+    .map(([peep, v]) => ({
+      peep: Number(peep),
+      cdyn: v.cdyn.reduce((a, x) => a + x, 0) / v.cdyn.length,
+      n: v.cdyn.length,
+      si: v.stressIndex,
+    }))
+    .filter((r) => r.n >= 3)
+    .sort((a, b) => b.peep - a.peep);
+  const best = rows.length >= 2 ? rows.reduce((a, b) => (b.cdyn > a.cdyn ? b : a)) : null;
+  return (
+    <Section title={m.peepTrialHeading}>
+      <p className="text-xs text-ink-3">{m.peepTrialHint}</p>
+      {rows.length === 0 ? (
+        <p className="text-sm text-ink-3">{m.peepTrialNone}</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-ink-3">
+              <th className="pb-1 font-normal">PEEP</th>
+              <th className="pb-1 text-right font-normal">C dyn mL/cmH₂O</th>
+              <th className="pb-1 text-right font-normal">Stress index</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.peep} className="border-t border-edge/60">
+                <td className="py-1 text-ink-2">
+                  {r.peep} {best?.peep === r.peep && <span className="text-xs text-ok">★ best</span>}
+                </td>
+                <td className="py-1 text-right font-readout text-ink tabular">
+                  {num(r.cdyn * 1000, 1)}
+                </td>
+                <td className="py-1 text-right text-ink-2 tabular">
+                  {r.si === null ? "–" : num(r.si, 2)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {best && (
+        <p className="text-sm text-ink">
+          {fmt(m.peepTrialBest, { peep: best.peep, suggest: best.peep + 2 })}
+        </p>
+      )}
+      {rows.length > 0 && (
+        <button
+          type="button"
+          onClick={() => useStore.setState({ peepTrial: {} })}
+          className="self-start rounded border border-edge px-2 py-1 text-sm text-ink-2 hover:bg-panel"
+        >
+          {m.peepTrialReset}
+        </button>
       )}
     </Section>
   );

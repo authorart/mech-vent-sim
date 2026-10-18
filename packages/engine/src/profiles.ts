@@ -11,7 +11,9 @@ export type ProfileId =
   | "metabolicAcidosis"
   | "cardiogenicEdema"
   | "massivePe"
-  | "centralApnea";
+  | "centralApnea"
+  | "neuromuscular"
+  | "ardsStiffChestWall";
 
 /** A Patient Profile: everything about the patient, nothing about the ventilator. */
 export interface PatientProfile {
@@ -58,6 +60,8 @@ export interface ProfileValues {
   overdistensionStiffness?: number;
   /** Sedation level the profile opens with (default deep, R4-Q1). */
   startSedation?: SedationLevel;
+  /** Blood pressure's dependence on venous return (see CirculationParams). Default 1. */
+  preloadSensitivity?: number;
   /** Further lung mechanics (M11): flow limitation, recruitment, viscoelasticity, chest wall. */
   lung?: Partial<Mechanics>;
 }
@@ -111,7 +115,12 @@ export function buildProfile(
       hco3: v.hco3,
       hb: HB,
     },
-    circulation: { hr: v.hr, sbp: v.sbp, dbp: v.dbp },
+    circulation: {
+      hr: v.hr,
+      sbp: v.sbp,
+      dbp: v.dbp,
+      ...(v.preloadSensitivity !== undefined && { preloadSensitivity: v.preloadSensitivity }),
+    },
   };
 }
 
@@ -258,6 +267,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       overdistensionStiffness: 20,
       startSedation: "awake",
       lung: { viscoResistance: 3, viscoTime: 1, chestWallCompliance: 0.2, pesOffset: 3 },
+      preloadSensitivity: 1.3,
       referencePh: 7.1,
     },
   ),
@@ -292,6 +302,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
         chestWallCompliance: 0.15,
         pesOffset: 4,
       },
+      preloadSensitivity: -0.5,
       referencePh: 7.3,
     },
   ),
@@ -317,6 +328,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       overdistensionVolume: 1.0,
       overdistensionStiffness: 20,
       lung: { viscoResistance: 3, viscoTime: 1, chestWallCompliance: 0.2, pesOffset: 3 },
+      preloadSensitivity: 1.5,
       referencePh: 7.35,
     },
   ),
@@ -343,6 +355,66 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       lung: { viscoResistance: 3, viscoTime: 1, chestWallCompliance: 0.2, pesOffset: 3 },
       referencePh: 7.4,
     },
+  ),
+  neuromuscular: buildProfile(
+    "neuromuscular",
+    "Neuromuscular weakness",
+    "Guillain–Barré type: normal lungs, weak breathing muscles. Small efforts that a sensitive trigger is needed to catch; comfortable on larger breaths.",
+    {
+      ...base,
+      compliance: 60,
+      rInsp: 5,
+      rExp: 5,
+      vco2: 200,
+      vdvt: 0.3,
+      shunt: 0.05,
+      hco3: 26,
+      neuralRate: 18,
+      pmusMax: 2.5,
+      hr: 95,
+      sbp: 125,
+      dbp: 75,
+      overdistensionVolume: 1.1,
+      overdistensionStiffness: 20,
+      startSedation: "awake",
+      lung: { viscoResistance: 3, viscoTime: 1, chestWallCompliance: 0.2, pesOffset: 3 },
+      referencePh: 7.3,
+    },
+  ),
+  ardsStiffChestWall: buildProfile(
+    "ardsStiffChestWall",
+    "ARDS with stiff chest wall",
+    "Obesity or high abdominal pressure: the chest wall takes much of the pressure. High plateau and esophageal pressure; the lung itself may be safe. PEEP near the esophageal pressure keeps it open.",
+    {
+      compliance: 15,
+      rInsp: 9,
+      rExp: 9,
+      vco2: 230,
+      vdvt: 0.55,
+      shunt: 0.45,
+      recruitable: 0.6,
+      peepHalf: 16,
+      vqMismatch: 0.05,
+      hco3: 22,
+      neuralRate: 28,
+      pmusMax: 8,
+      hr: 110,
+      sbp: 125,
+      dbp: 75,
+      overdistensionVolume: 0.9,
+      overdistensionStiffness: 60,
+      lung: {
+        recruitCompliance: 0.015,
+        recruitClosing: 16,
+        recruitOpening: 40,
+        viscoResistance: 4,
+        viscoTime: 1,
+        chestWallCompliance: 0.04,
+        pesOffset: 10,
+      },
+      referencePh: 7.3,
+    },
+    6,
   ),
 };
 

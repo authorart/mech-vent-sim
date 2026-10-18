@@ -123,6 +123,22 @@ export function Numerics() {
           dim={x?.cstat == null}
         />
         <Readout label="R aw" value={num(x?.raw)} unit="cmH₂O/L/s" dim={x?.raw == null} />
+        <Readout
+          label="C dyn"
+          value={num(x?.cdyn != null ? x.cdyn * 1000 : null)}
+          unit="mL/cmH₂O"
+          dim={x?.cdyn == null}
+        />
+        <Readout
+          label="Stress index"
+          value={num(x?.stressIndex, 2)}
+          dim={x?.stressIndex == null}
+          note={
+            x?.stressIndex != null
+              ? m.stressIndexHint[x.stressIndex < 0.9 ? "low" : x.stressIndex > 1.1 ? "high" : "ok"]
+              : null
+          }
+        />
       </Group>
     </div>
   );
@@ -156,6 +172,13 @@ export function GasPanel() {
           <Readout label="HR" value={num(v.hr)} unit="/min" />
           <Readout label="BP" value={`${num(v.sbp)}/${num(v.dbp)}`} unit="mmHg" />
           <Readout label="MAP" value={num(v.map)} unit="mmHg" />
+          <Readout
+            label="PPV"
+            value={num(v.ppv)}
+            unit="%"
+            dim={v.ppv == null}
+            note={m.ppvHint}
+          />
         </div>
       </div>
     </div>

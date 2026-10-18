@@ -3,6 +3,12 @@ export interface CirculationParams {
   hr: number;
   sbp: number;
   dbp: number;
+  /**
+   * How much blood pressure depends on venous return (M14). 1 = the V1 rule; > 1 preload
+   * dependent (hypovolemia, RV failure); < 0 the failing left ventricle that positive
+   * intrathoracic pressure helps (Hess & Kacmarek ch. 23). Default 1.
+   */
+  preloadSensitivity?: number;
 }
 
 export interface Vitals {
@@ -11,6 +17,8 @@ export interface Vitals {
   dbp: number;
   map: number;
   spo2: number;
+  /** Pulse pressure variation (%) over the breath; null when the patient is breathing actively. */
+  ppv: number | null;
 }
 
 export interface VitalsInputs {
@@ -19,7 +27,14 @@ export interface VitalsInputs {
   /** True PEEP_i (cmH2O). */
   peepI: number;
   spo2: number;
+  /** Change in pleural (esophageal) pressure over a passive breath (cmH2O). */
+  pleuralSwing?: number;
+  /** The last breath was passive (no patient effort), so PPV can be read. */
+  passive?: boolean;
 }
+
+/** PPV (%) per cmH2O of pleural swing at preload sensitivity 1: normal lungs, Vt 500 → ~5%. */
+const PPV_PER_CMH2O = 2.2;
 
 /** P_mean above this starts to reduce venous return (cmH2O). */
 const PMEAN_THRESHOLD = 12;
@@ -44,14 +59,21 @@ export class Circulation {
 
   targets(inputs: VitalsInputs): Vitals {
     const { hr, sbp, dbp } = this.params;
+    const sensitivity = this.params.preloadSensitivity ?? 1;
     const drop =
-      SBP_PER_PMEAN * Math.max(0, inputs.pmean - PMEAN_THRESHOLD) +
-      SBP_PER_PEEPI * Math.max(0, inputs.peepI);
+      sensitivity *
+      (SBP_PER_PMEAN * Math.max(0, inputs.pmean - PMEAN_THRESHOLD) +
+        SBP_PER_PEEPI * Math.max(0, inputs.peepI));
     const s = Math.max(40, sbp - drop);
     // Pulse pressure narrows as SBP falls.
     const d = Math.max(25, dbp - drop * 0.6);
     const h = hr + HR_PER_SBP_DROP * drop + HR_PER_SPO2_POINT * Math.max(0, 90 - inputs.spo2);
-    return { hr: Math.min(180, h), sbp: s, dbp: d, map: d + (s - d) / 3, spo2: inputs.spo2 };
+    // Each positive-pressure breath squeezes venous return; the swing shows in the pulse pressure.
+    const ppv =
+      inputs.passive && inputs.pleuralSwing !== undefined
+        ? Math.min(40, PPV_PER_CMH2O * inputs.pleuralSwing * Math.max(0.3, sensitivity))
+        : null;
+    return { hr: Math.min(180, h), sbp: s, dbp: d, map: d + (s - d) / 3, spo2: inputs.spo2, ppv };
   }
 
   prime(inputs: VitalsInputs): void {
@@ -71,6 +93,7 @@ export class Circulation {
       dbp,
       map: dbp + (sbp - dbp) / 3,
       spo2: inputs.spo2,
+      ppv: tg.ppv,
     };
     return this.current;
   }

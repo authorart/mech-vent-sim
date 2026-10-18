@@ -31,6 +31,13 @@ export interface BreathMetrics {
   cstat: number | null;
   /** Airway resistance from this breath's plateau (cmH2O/(L/s)); needs constant flow at end of inspiration. */
   raw: number | null;
+  /**
+   * Esophageal-balloon values of this breath (M14): end-inspiratory and end-expiratory esophageal
+   * pressure, and transpulmonary pressure (alveolar − esophageal) at those moments.
+   */
+  esophageal: { pesEndInsp: number; pesEndExp: number; plEndInsp: number; plEndExp: number };
+  /** Dynamic compliance: Vte ÷ (P peak − PEEP) (L/cmH2O), for a decremental PEEP trial. */
+  cdyn: number | null;
   /** Stress index of this breath (passive constant-flow VCV only), see BreathRecord. */
   stressIndex: number | null;
   /** Asynchronies of this breath (M12, engine truth). */
@@ -109,6 +116,13 @@ export class Monitor {
       drivingPressure: this.pplat ? this.pplat.value - baseline : null,
       cstat,
       raw,
+      cdyn: b.peakPaw - b.peep >= 1 ? b.vte / (b.peakPaw - b.peep) : null,
+      esophageal: {
+        pesEndInsp: b.pesEndInsp,
+        pesEndExp: b.pesEndExp,
+        plEndInsp: b.endInspRecoil - b.pesEndInsp,
+        plEndExp: b.endExpRecoil - b.pesEndExp,
+      },
       stressIndex: b.stressIndex,
       asynchronies: b.asynchronies,
       asynchrony: null,

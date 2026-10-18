@@ -205,6 +205,7 @@ export class Session {
       hr: c.hr + fx.hrAdd,
       sbp: c.sbp * fx.bpFactor,
       dbp: c.dbp * fx.bpFactor,
+      ...(c.preloadSensitivity !== undefined && { preloadSensitivity: c.preloadSensitivity }),
     };
     return out;
   }
@@ -322,10 +323,14 @@ export class Session {
   private stepPhysiology(seconds: number): SessionStep["physiology"] {
     const t = this.sim.time;
     const inputs = this.gasInputs();
+    const record = this.latestRecord;
+    const ccw = this.baseMechanics.chestWallCompliance ?? 0.2;
     const vitalsInputs = () => ({
       pmean: this.latest?.pmean ?? this.sim.currentSettings.peep,
       peepI: this.latest?.truth.peepI ?? 0,
       spo2: this.gas.state?.spo2 ?? 97,
+      pleuralSwing: record ? record.lungVti / ccw : 0,
+      passive: !!record && record.trigger !== "patient" && this.appliedDrive.pmusMax < 0.5,
     });
 
     if (!this.gas.primed) {
