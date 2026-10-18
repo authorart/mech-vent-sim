@@ -2,6 +2,8 @@
 
 import {
   PROFILES,
+  type Agitation,
+  type PatientFeatures,
   type ProfileId,
   type ProfilePatch,
   type SedationLevel,
@@ -226,6 +228,40 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
           Applied drive: P_mus {num(engine.appliedDrive.pmusMax, 1)} cmH₂O at{" "}
           {num(engine.appliedDrive.neuralRate)}/min
         </p>
+      </Section>
+
+      <Section title={m.breathingPattern}>
+        <Segmented<PatientFeatures["breathing"]>
+          label={m.breathingPattern}
+          value={engine.features.breathing}
+          options={(["natural", "regular"] as const).map((v) => ({
+            value: v,
+            label: m.breathing[v],
+          }))}
+          onChange={(breathing) => send({ type: "setPatientFeatures", features: { breathing } })}
+        />
+        <p className="text-xs text-ink-3">{m.breathingHint}</p>
+        <span className="text-sm text-ink-2">{m.agitation}</span>
+        <Segmented<Agitation>
+          label={m.agitation}
+          value={engine.features.agitation}
+          options={(["none", "moderate", "severe"] as const).map((v) => ({
+            value: v,
+            label: m.agitationLevel[v],
+          }))}
+          onChange={(agitation) => send({ type: "setPatientFeatures", features: { agitation } })}
+        />
+        <p className="text-xs text-ink-3">{m.agitationHint}</p>
+        <span className="text-sm text-ink-2">{m.reverseTriggering}</span>
+        <Segmented<"off" | "on">
+          label={m.reverseTriggering}
+          value={engine.features.reverseTriggering ? "on" : "off"}
+          options={(["off", "on"] as const).map((v) => ({ value: v, label: m.onOff[v] }))}
+          onChange={(v) =>
+            send({ type: "setPatientFeatures", features: { reverseTriggering: v === "on" } })
+          }
+        />
+        <p className="text-xs text-ink-3">{m.reverseTriggeringHint}</p>
       </Section>
 
       <Section title={m.patient}>

@@ -11,6 +11,7 @@ const base: CaseState = {
   sex: "female",
   heightCm: 160,
   patch: { mechanics: { rExp: 70 } },
+  features: { breathing: "regular", agitation: "moderate", reverseTriggering: true },
 };
 
 describe("Case links", () => {
@@ -23,6 +24,15 @@ describe("Case links", () => {
   it("round-trip PSV settings with backup", () => {
     const c = { ...base, settings: settingsForMode("PSV", INITIAL_SETTINGS) };
     expect(decodeCase(encodeCase(c))).toEqual(c);
+  });
+
+  it("older links without features get the default breathing", () => {
+    const { features: _, ...old } = base;
+    expect(decodeCase(encodeCase(old))?.features).toEqual({
+      breathing: "natural",
+      agitation: "none",
+      reverseTriggering: false,
+    });
   });
 
   it("reject garbage, unknown profiles and malformed settings", () => {

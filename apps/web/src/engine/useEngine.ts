@@ -2,6 +2,7 @@
 
 import {
   decodeCase,
+  DEFAULT_FEATURES,
   diffFromProfile,
   encodeCase,
   INITIAL_SETTINGS,
@@ -42,6 +43,7 @@ export function currentCase(): CaseState | null {
     sex,
     heightCm,
     patch: diffFromProfile(engine.profileId, engine),
+    features: engine.features,
   };
 }
 
@@ -56,6 +58,7 @@ function isUntouchedDefault(c: CaseState, defaultProfile: ProfileId): boolean {
     c.profileId === defaultProfile &&
     c.sedation === PROFILES[defaultProfile].startSedation &&
     Object.keys(c.patch).length === 0 &&
+    JSON.stringify(c.features ?? DEFAULT_FEATURES) === JSON.stringify(DEFAULT_FEATURES) &&
     JSON.stringify(c.settings) === JSON.stringify(INITIAL_SETTINGS)
   );
 }
@@ -66,6 +69,7 @@ export function loadCase(c: CaseState): void {
   setPatientSize(c.sex, c.heightCm);
   send({ type: "loadProfile", profileId: c.profileId, settings: c.settings });
   send({ type: "setSedation", level: c.sedation });
+  send({ type: "setPatientFeatures", features: c.features ?? DEFAULT_FEATURES });
   if (Object.keys(c.patch).length > 0) send({ type: "setProfileParam", patch: c.patch });
 }
 
@@ -86,6 +90,7 @@ export function useEngine(defaultProfile: ProfileId): void {
       if (Object.keys(linked.patch).length > 0) {
         client.send({ type: "setProfileParam", patch: linked.patch });
       }
+      if (linked.features) client.send({ type: "setPatientFeatures", features: linked.features });
     } else {
       client.init(defaultProfile);
       const saved = savedCase();

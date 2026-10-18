@@ -1,4 +1,4 @@
-import type { SedationLevel } from "./drive";
+import { DEFAULT_FEATURES, type PatientFeatures, type SedationLevel } from "./drive";
 import type { GasParams } from "./gas";
 import { PROFILES, type ProfileId, type Sex } from "./profiles";
 import type { ProfilePatch } from "./protocol";
@@ -19,6 +19,8 @@ export interface CaseState {
   heightCm: number;
   /** Only the values that differ from the profile defaults. */
   patch: ProfilePatch;
+  /** How the patient breathes (M9). Older links without it use the defaults. */
+  features?: PatientFeatures;
 }
 
 const MODES: Mode[] = ["VCV", "PCV", "PSV"];
@@ -116,6 +118,16 @@ export function decodeCase(encoded: string): CaseState | null {
     sex: raw.sex === "female" ? "female" : "male",
     heightCm: isNum(raw.heightCm) ? Math.min(220, Math.max(120, raw.heightCm)) : 170,
     patch,
+    features: decodeFeatures(raw.features),
+  };
+}
+
+function decodeFeatures(f: unknown): PatientFeatures {
+  if (!isObj(f)) return { ...DEFAULT_FEATURES };
+  return {
+    breathing: f.breathing === "regular" ? "regular" : "natural",
+    agitation: f.agitation === "moderate" || f.agitation === "severe" ? f.agitation : "none",
+    reverseTriggering: f.reverseTriggering === true,
   };
 }
 

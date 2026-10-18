@@ -59,6 +59,17 @@ export const en = {
     "Loading a profile restarts the patient on the Initial Settings, deeply sedated.",
   sedation: "Sedation",
   sedationLevel: { deep: "Deep", light: "Light", awake: "Awake" },
+  breathingPattern: "Breathing pattern",
+  breathing: { natural: "Natural", regular: "Regular" },
+  breathingHint:
+    "Natural: each effort varies a little in rate, depth and length, with an occasional sigh. Regular: identical efforts, for clean demonstrations.",
+  agitation: "Agitation or pain",
+  agitationLevel: { none: "None", moderate: "Moderate", severe: "Severe" },
+  agitationHint: "Stronger, faster and more irregular efforts while the patient is not deeply sedated.",
+  reverseTriggering: "Reverse triggering",
+  onOff: { off: "Off", on: "On" },
+  reverseTriggeringHint:
+    "A deeply sedated patient makes an effort in response to each machine breath, about 0.5 s after it starts. It can trigger a second, stacked breath.",
   patient: "Patient",
   sex: { male: "Male", female: "Female" },
   height: "Height",

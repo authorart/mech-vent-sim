@@ -1,6 +1,11 @@
 export * from "./types";
 export { LinearLung, type LungModel } from "./lung";
-export { PatientEffort } from "./effort";
+export {
+  PatientEffort,
+  NATURAL_VARIABILITY,
+  ENTRAINED_EFFORT,
+  type EffortVariability,
+} from "./effort";
 export {
   Simulator,
   DT,
@@ -10,6 +15,7 @@ export {
   MAX_PSV_INSP_TIME,
   HOLD_TIME,
   MANEUVER_EFFORT_LIMIT,
+  PEXP_GAIN,
   type AdvanceResult,
   type SimulatorOptions,
 } from "./simulator";
@@ -60,6 +66,11 @@ export {
   SEDATION_FACTOR,
   chemoreflexMultiplier,
   effectiveDrive,
+  AGITATION_EFFECT,
+  DEFAULT_FEATURES,
+  WAKEFULNESS_FLOOR,
+  type Agitation,
+  type PatientFeatures,
   type SedationLevel,
 } from "./drive";
 export {

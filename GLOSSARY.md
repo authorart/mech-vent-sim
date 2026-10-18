@@ -52,6 +52,10 @@ _Avoid_: case, exercise, simulation
 The size of the patient's inspiratory effort, expressed as pressure. It is always zero or positive and helps inflate the lungs in the equation of motion.
 _Avoid_: negative P_mus, patient pressure
 
+**Expiratory Muscle Pressure (P_exp)**:
+The patient pushing gas out with the expiratory muscles, as pressure. Always zero or positive, kept separate from Muscle Pressure. It appears when the ventilator keeps inflating after the patient has stopped breathing in.
+_Avoid_: negative P_mus, active P_mus
+
 **Pleural Pressure Swing**:
 The drop in pleural (esophageal) pressure the patient's effort causes. It is shown as a negative deflection. It is the measured sign of Muscle Pressure, not the same quantity.
 _Avoid_: P_mus (when meaning the negative trace)
@@ -95,6 +99,18 @@ Holding inspiration at end-inspiration with no flow. P_plat is read during this 
 How much of the patient's own respiratory drive is allowed through: deep (none), light (half), awake (full). Patients start deeply sedated.
 _Avoid_: paralysis (that's a different thing), consciousness
 
+**Breathing Pattern**:
+Whether the patient's efforts vary breath to breath (natural, with occasional sighs) or repeat identically (regular, for demonstrations).
+_Avoid_: noise, randomness
+
+**Sigh**:
+An occasional deeper and longer effort, followed by a longer pause, that is part of natural breathing.
+_Avoid_: yawn, recruitment breath
+
+**Agitation**:
+Pain, anxiety or delirium raising the patient's drive and making the pattern more irregular, while the patient is not deeply sedated.
+_Avoid_: fighting the ventilator
+
 **Chemoreflex**:
 The patient's drive rising as arterial pH falls and fading as pH rises. The chemical part of drive stops near the apneic threshold.
 _Avoid_: CO2 response, feedback
@@ -124,6 +140,18 @@ _Avoid_: missed breath, wasted effort
 **Double Trigger**:
 Two ventilator breaths delivered for a single patient effort, because the effort outlasts the ventilator's inspiratory time.
 _Avoid_: breath stacking (that's a different thing)
+
+**Reverse Trigger**:
+A patient effort set off by a passive machine breath rather than the other way round, typically in a deeply sedated patient. It can trigger a second, stacked breath.
+_Avoid_: entrainment (that's the mechanism), backward trigger
+
+**Delayed Cycling**:
+The ventilator's inspiration lasting beyond the patient's own; the patient pushes back (Expiratory Muscle Pressure). In PSV it comes from a long time constant or an Esens set too low.
+_Avoid_: late cycling, prolonged Ti
+
+**Premature Cycling**:
+The ventilator's inspiration ending before the patient's; the continuing effort can cause a Double Trigger.
+_Avoid_: early cycling, short cycling
 
 **Flow Starvation**:
 The patient demanding more flow than a volume-controlled breath delivers. It shows as a scooped-out airway pressure trace.

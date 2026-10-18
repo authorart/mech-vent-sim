@@ -3,14 +3,14 @@
  * shapes that cross the boundary. Bump ENGINE_CONTRACT_VERSION when any shape changes.
  */
 import type { AlarmEvent, AlarmLimits, AlarmState } from "./alarms";
-import type { SedationLevel } from "./drive";
+import type { PatientFeatures, SedationLevel } from "./drive";
 import type { BloodGas, GasParams } from "./gas";
 import type { BreathMetrics } from "./monitor";
 import type { ProfileId } from "./profiles";
 import type { Drive, EngineEvent, Mechanics, VentSettings } from "./types";
 import type { CirculationParams, Vitals } from "./vitals";
 
-export const ENGINE_CONTRACT_VERSION = 2;
+export const ENGINE_CONTRACT_VERSION = 3;
 
 /** Instructor Panel changes; each field is merged into the running patient. */
 export interface ProfilePatch {
@@ -32,6 +32,7 @@ export type EngineCommand =
   | { type: "applySettings"; settings: VentSettings }
   | { type: "setProfileParam"; patch: ProfilePatch }
   | { type: "setSedation"; level: SedationLevel }
+  | { type: "setPatientFeatures"; features: Partial<PatientFeatures> }
   | { type: "inspiratoryPause" }
   | { type: "expiratoryHold" }
   | { type: "endApneaBackup" }
@@ -49,6 +50,7 @@ export interface EngineState {
   pendingSettings: VentSettings | null;
   apneaBackupActive: boolean;
   sedation: SedationLevel;
+  features: PatientFeatures;
   appliedDrive: Drive;
   mechanics: Mechanics;
   baseDrive: Drive;

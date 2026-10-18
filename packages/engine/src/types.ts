@@ -168,5 +168,7 @@ export const SAMPLE = {
   VOLUME: 3,
   PALV: 4,
   PMUS: 5,
-  STRIDE: 6,
+  /** Expiratory Muscle Pressure (cmH2O, ≥ 0): the patient pushing gas out (ADR-0002 amendment). */
+  PEXP: 6,
+  STRIDE: 7,
 } as const;

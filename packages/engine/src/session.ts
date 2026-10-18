@@ -1,4 +1,12 @@
-import { chemoreflexMultiplier, effectiveDrive, type SedationLevel } from "./drive";
+import {
+  AGITATION_EFFECT,
+  chemoreflexMultiplier,
+  DEFAULT_FEATURES,
+  effectiveDrive,
+  type PatientFeatures,
+  type SedationLevel,
+} from "./drive";
+import { NATURAL_VARIABILITY, type EffortVariability } from "./effort";
 import { AlarmEngine, type AlarmEvent, type AlarmLimits } from "./alarms";
 import { GasExchange, type BloodGas, type GasInputs, type GasParams } from "./gas";
 import { Monitor, type BreathMetrics } from "./monitor";
@@ -25,6 +33,10 @@ export interface SessionOptions extends SimulatorOptions {
   sedation?: SedationLevel;
   /** Chemoreflex reference pH (default 7.40). */
   referencePh?: number;
+  /** How the patient breathes (default: natural, no agitation, no reverse triggering). */
+  features?: PatientFeatures;
+  /** Seed for the breathing variability (default 1), so a case replays the same breaths. */
+  seed?: number;
 }
 
 /** Healthy adult gas exchange, used when a Session is created without profile values. */
@@ -59,6 +71,8 @@ export class Session {
   baseDrive: Drive;
   sedation: SedationLevel;
   referencePh: number;
+  features: PatientFeatures;
+  readonly seed: number;
 
   private latest: BreathMetrics | null = null;
   private latestRecord: BreathRecord | null = null;
@@ -68,10 +82,17 @@ export class Session {
     this.baseDrive = { ...opts.patient.drive };
     this.sedation = opts.sedation ?? "deep";
     this.referencePh = opts.referencePh ?? 7.4;
+    this.features = { ...(opts.features ?? DEFAULT_FEATURES) };
+    this.seed = opts.seed ?? 1;
     this.sim = new Simulator({
       ...opts,
-      patient: { ...opts.patient, drive: effectiveDrive(this.baseDrive, this.sedation, 1) },
+      patient: {
+        ...opts.patient,
+        drive: effectiveDrive(this.baseDrive, this.sedation, 1, this.features.agitation),
+      },
+      variability: this.variability(),
     });
+    this.sim.reverseTriggering = this.features.reverseTriggering;
     this.alarms = new AlarmEngine(opts.alarmLimits);
     this.gas = new GasExchange({ ...(opts.gas ?? NORMAL_GAS) });
     this.circulation = new Circulation({ ...(opts.circulation ?? NORMAL_CIRCULATION) });
@@ -84,6 +105,27 @@ export class Session {
   /** The drive currently applied, after sedation and chemoreflex. */
   get appliedDrive(): Drive {
     return this.sim.effort.drive;
+  }
+
+  /** Change how the patient breathes (Instructor Panel). */
+  setFeatures(patch: Partial<PatientFeatures>): void {
+    this.features = { ...this.features, ...patch };
+    this.sim.effort.setVariability(this.variability());
+    this.sim.reverseTriggering = this.features.reverseTriggering;
+    this.updateDrive();
+  }
+
+  private variability(): EffortVariability | null {
+    if (this.features.breathing === "regular") return null;
+    const k = AGITATION_EFFECT[this.features.agitation].variability;
+    const v = NATURAL_VARIABILITY;
+    return {
+      seed: this.seed,
+      cvRate: v.cvRate * k,
+      cvAmplitude: v.cvAmplitude * k,
+      cvTi: v.cvTi * k,
+      sighEvery: v.sighEvery,
+    };
   }
 
   setSedation(level: SedationLevel): void {
@@ -161,7 +203,9 @@ export class Session {
 
   private updateDrive(): void {
     const m = chemoreflexMultiplier(this.gas.state?.ph ?? null, this.referencePh);
-    this.sim.setPatient({ drive: effectiveDrive(this.baseDrive, this.sedation, m) });
+    this.sim.setPatient({
+      drive: effectiveDrive(this.baseDrive, this.sedation, m, this.features.agitation),
+    });
   }
 
   private gasInputs(): GasInputs {
@@ -175,6 +219,7 @@ export class Session {
 export interface ProfileSessionOptions {
   settings?: VentSettings;
   sedation?: SedationLevel;
+  features?: PatientFeatures;
   alarmLimits?: AlarmLimits;
   firstEffortAt?: number;
 }
@@ -189,6 +234,7 @@ export function createProfileSession(id: ProfileId, opts: ProfileSessionOptions 
     circulation: p.circulation,
     referencePh: p.referencePh,
     sedation: opts.sedation ?? p.startSedation,
+    ...(opts.features ? { features: opts.features } : {}),
     ...(opts.alarmLimits ? { alarmLimits: opts.alarmLimits } : {}),
     ...(opts.firstEffortAt !== undefined ? { firstEffortAt: opts.firstEffortAt } : {}),
   });

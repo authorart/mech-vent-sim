@@ -95,6 +95,9 @@ export class EngineHost {
       case "setSedation":
         s.setSedation(cmd.level);
         break;
+      case "setPatientFeatures":
+        s.setFeatures(cmd.features);
+        break;
       case "inspiratoryPause":
         s.sim.inspiratoryPause();
         return;
@@ -146,6 +149,7 @@ export class EngineHost {
       pendingSettings: s.sim.pendingSettings,
       apneaBackupActive: s.sim.isApneaBackupActive,
       sedation: s.sedation,
+      features: { ...s.features },
       appliedDrive: s.appliedDrive,
       mechanics: { ...s.sim.lung.mechanics },
       baseDrive: { ...s.baseDrive },

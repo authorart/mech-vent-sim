@@ -1,4 +1,4 @@
-import { PatientEffort } from "./effort";
+import { PatientEffort, type EffortVariability } from "./effort";
 import { LinearLung } from "./lung";
 import type {
   BreathRecord,
@@ -43,6 +43,16 @@ export const VALVE_OPENING_RESISTANCE = 40;
 export const VALVE_OPENING_TIME = 0.04;
 /** Time the VCV flow valve takes to reach the set flow (s). Ti is lengthened so Vt stays exact. */
 export const FLOW_RAMP_TIME = 0.05;
+/**
+ * Expiratory muscles (ADR-0002 amendment): when the ventilator keeps inflating after the patient
+ * has stopped breathing in, the patient pushes back, up to this fraction of their peak Muscle
+ * Pressure, building with PEXP_RISE and fading with PEXP_FALL time constants (s).
+ */
+export const PEXP_GAIN = 0.8;
+export const PEXP_RISE = 0.15;
+export const PEXP_FALL = 0.2;
+/** Grace after neural inspiration ends before expiratory muscles join in (s). */
+export const PEXP_DELAY = 0.05;
 
 export interface AdvanceResult {
   /** Interleaved Samples; see `SAMPLE` for the layout. */
@@ -94,6 +104,8 @@ export interface SimulatorOptions {
   settings: VentSettings;
   /** Time of the patient's first effort (s). */
   firstEffortAt?: number;
+  /** Breath-to-breath variability of the patient's effort (default: none, every cycle identical). */
+  variability?: EffortVariability | null;
 }
 
 /**
@@ -124,6 +136,13 @@ export class Simulator {
   private heldTrigger: BreathTrigger = "mandatory";
   private psvPeakFlow = 0;
 
+  /** Reverse triggering: passive inflations entrain a patient effort (R6-Q2). */
+  reverseTriggering = false;
+  /** Expiratory Muscle Pressure (cmH2O, ≥ 0), held constant within a tick. */
+  private pexp = 0;
+  /** When the effort that belongs to the current breath stops breathing in (null = none). */
+  private breathNeuralEnd: number | null = null;
+
   /** Largest Muscle Pressure seen during the current pause or hold. */
   private maneuverEffort = 0;
   private inspPauseRequested = false;
@@ -139,7 +158,11 @@ export class Simulator {
   constructor(opts: SimulatorOptions) {
     this.settings = opts.settings;
     this.lung = new LinearLung({ ...opts.patient.mechanics });
-    this.effort = new PatientEffort({ ...opts.patient.drive }, opts.firstEffortAt ?? 1);
+    this.effort = new PatientEffort(
+      { ...opts.patient.drive },
+      opts.firstEffortAt ?? 1,
+      opts.variability ?? null,
+    );
     this.volume = this.lung.volumeAtPressure(this.settings.peep);
     this.lastPaw = this.settings.peep;
     if (this.settings.mode !== "PSV") this.startBreath(0, "mandatory");
@@ -229,13 +252,14 @@ export class Simulator {
 
     const t = this.step * DT;
     const pmus = this.effort.pmus(t);
+    const net = pmus - this.pexp;
     const flow = this.flowFor(control, t, this.volume);
-    const paw = this.pawFor(control, t, this.volume, pmus, flow);
-    const palv = this.lung.alveolarPressure(this.volume, pmus);
+    const paw = this.pawFor(control, t, this.volume, net, flow);
+    const palv = this.lung.alveolarPressure(this.volume, net);
     this.lastPaw = paw;
     this.lastFlow = flow;
     if (this.phase === "pause" || this.phase === "expiratoryHold") {
-      this.maneuverEffort = Math.max(this.maneuverEffort, pmus);
+      this.maneuverEffort = Math.max(this.maneuverEffort, pmus, this.pexp);
     }
 
     if (this.acc) {
@@ -250,8 +274,9 @@ export class Simulator {
     }
 
     if (this.step % OUTPUT_EVERY === 0) {
-      this.outSamples.push(t, paw, flow, this.displayVolume, palv, pmus);
+      this.outSamples.push(t, paw, flow, this.displayVolume, palv, pmus, this.pexp);
     }
+    this.updateExpiratoryMuscles(t);
 
     this.transition(t, flow, paw);
   }
@@ -261,8 +286,21 @@ export class Simulator {
     return this.lung.alveolarPressure(this.volume, 0);
   }
 
+  /**
+   * The patient pushes back when the ventilator keeps inflating after their own inspiration is
+   * over (delayed cycling, an inspiratory time set too long): the end-inspiratory pressure bump.
+   */
+  private updateExpiratoryMuscles(t: number): void {
+    const inflating = this.phase === "inspiration" || this.phase === "pause";
+    const overrun =
+      inflating && this.breathNeuralEnd !== null && t > this.breathNeuralEnd + PEXP_DELAY;
+    const target = overrun && !this.effort.inspiring(t) ? PEXP_GAIN * this.effort.drive.pmusMax : 0;
+    const tau = target > this.pexp ? PEXP_RISE : PEXP_FALL;
+    this.pexp += (target - this.pexp) * Math.min(1, DT / tau);
+  }
+
   private flowFor(control: Control, t: number, v: number): number {
-    const pmus = this.effort.pmus(t);
+    const pmus = this.effort.pmus(t) - this.pexp;
     switch (control.kind) {
       case "flow":
         return control.q(t);
@@ -503,6 +541,11 @@ export class Simulator {
       }
     }
     this.breath = this.resolveBreath(this.settings);
+    // The effort this breath answers (a patient trigger, or an effort already under way).
+    this.breathNeuralEnd = this.effort.inspirationEndsAt(t);
+    if (this.reverseTriggering && trigger !== "patient" && this.effort.drive.pmusMax <= 0) {
+      this.effort.entrain(t);
+    }
     this.phase = "inspiration";
     this.phaseStart = t;
     this.lastBreathStart = t;
