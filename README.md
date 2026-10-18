@@ -38,9 +38,10 @@ corepack pnpm build
 ## Using it
 
 - **Settings strip** (bottom): change knobs, then **Confirm**. Changes apply at the next breath. Mode buttons open a dialog to check the new mode's settings.
+- **Modes:** VCV and PCV (assist-control), PSV (with apnea backup), and **V-SIMV / P-SIMV**: mandatory breaths at the SIMV rate, each synchronized to a patient effort in the assist window (the first quarter of each cycle), with pressure-supported spontaneous breaths between them. In SIMV the monitor splits the rate and Vte into mandatory and spontaneous breaths.
 - **Insp. pause / Exp. hold** measure P_plat and Total PEEP (PEEP_i).
 - **Freeze** stops the traces; move over them to read values. **4th trace** adds esophageal pressure or the capnogram.
-- **Asynchrony guide** (top bar): one card per asynchrony type with a live example, how to recognize it, why it happens and how to fix it, and **Show me on the simulator**.
+- **Asynchrony guide** (top bar): one card per asynchrony type (including SIMV mode asynchrony) with a live example, how to recognize it, why it happens and how to fix it, and **Show me on the simulator**.
 - **Instructor** panel:
   - load one of 10 Patient Profiles, change sedation, breathing pattern (natural/regular, agitation, reverse triggering, heartbeat ripple) and patient values live;
   - **Targets** for the profile (optionally shown to learners) and **Apply recommended start**;

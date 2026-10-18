@@ -60,7 +60,13 @@ export interface Patient {
   drive: Drive;
 }
 
-export type Mode = "VCV" | "PCV" | "PSV";
+/** How one breath is delivered: volume control, pressure control or pressure support. */
+export type BreathKind = "VCV" | "PCV" | "PSV";
+
+export type Mode = BreathKind | "V-SIMV" | "P-SIMV";
+
+/** Mandatory Breath (size and length set by the ventilator) or Spontaneous Breath (by the patient). */
+export type BreathType = "mandatory" | "spontaneous";
 
 export type TriggerSetting =
   | { type: "flow"; /** L/s */ threshold: number }
@@ -120,7 +126,40 @@ export interface PsvSettings extends CommonSettings {
   backup: BackupSettings;
 }
 
-export type VentSettings = VcvSettings | PcvSettings | PsvSettings;
+/** Pressure support for the Spontaneous Breaths between SIMV Mandatory Breaths (R7-Q2). */
+interface SpontaneousSupport {
+  /** Pressure support above PEEP (cmH2O); 0 = CPAP. */
+  pSupport: number;
+  /** Expiratory Sensitivity of the supported breaths (0–1). */
+  esens: number;
+}
+
+/** V-SIMV: volume-controlled Mandatory Breaths at the SIMV rate, pressure support between. */
+export interface VsimvSettings extends CommonSettings, SpontaneousSupport {
+  mode: "V-SIMV";
+  tidalVolume: number;
+  /** SIMV rate: Mandatory Breaths per minute. */
+  rate: number;
+  peakFlow: number;
+  flowPattern: "square" | "decelerating";
+  pauseTime: number;
+  /** Rise time of the pressure-supported breaths (s). */
+  riseTime: number;
+}
+
+/** P-SIMV: pressure-controlled Mandatory Breaths at the SIMV rate, pressure support between. */
+export interface PsimvSettings extends CommonSettings, SpontaneousSupport {
+  mode: "P-SIMV";
+  pInsp: number;
+  rate: number;
+  inspTime: number;
+  /** Rise time of both the Mandatory and the supported breaths (s). */
+  riseTime: number;
+}
+
+export type SimvSettings = VsimvSettings | PsimvSettings;
+
+export type VentSettings = VcvSettings | PcvSettings | PsvSettings | SimvSettings;
 
 export type BreathTrigger = "mandatory" | "patient" | "backup";
 
@@ -129,7 +168,9 @@ export interface BreathRecord {
   startTime: number;
   endTime: number;
   trigger: BreathTrigger;
-  mode: Mode;
+  /** How this breath was delivered (an SIMV breath is VCV/PCV when mandatory, PSV when spontaneous). */
+  mode: BreathKind;
+  breathType: BreathType;
   /** Set PEEP during this breath (cmH2O). */
   peep: number;
   /** Time from breath start to start of expiration, including any pause (s). */
@@ -187,7 +228,7 @@ export interface BreathRecord {
 }
 
 export type EngineEvent =
-  | { type: "breathStart"; t: number; trigger: BreathTrigger }
+  | { type: "breathStart"; t: number; trigger: BreathTrigger; breathType: BreathType }
   | { type: "settingsApplied"; t: number }
   | { type: "apneaBackupStarted"; t: number }
   | { type: "apneaBackupEnded"; t: number }

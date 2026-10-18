@@ -32,7 +32,7 @@ export interface CaseEvent {
   resolvedAt: number | null;
 }
 
-const MODES: Mode[] = ["VCV", "PCV", "PSV"];
+const MODES: Mode[] = ["VCV", "PCV", "PSV", "V-SIMV", "P-SIMV"];
 const SEDATION: SedationLevel[] = ["deep", "light", "awake"];
 
 function toBase64Url(s: string): string {
@@ -87,6 +87,15 @@ function validSettings(s: unknown): s is VentSettings {
         [b.pInsp, b.rate, b.inspTime].every(isNum)
       );
     }
+    case "V-SIMV":
+      return (
+        [s.tidalVolume, s.rate, s.peakFlow, s.pauseTime, s.pSupport, s.esens, s.riseTime].every(
+          isNum,
+        ) &&
+        (s.flowPattern === "square" || s.flowPattern === "decelerating")
+      );
+    case "P-SIMV":
+      return [s.pInsp, s.rate, s.inspTime, s.riseTime, s.pSupport, s.esens].every(isNum);
     default:
       return false;
   }

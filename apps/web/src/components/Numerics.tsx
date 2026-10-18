@@ -4,7 +4,7 @@ import type { Measured } from "@mech-vent/engine";
 import type { ReactNode } from "react";
 import { ie, num } from "@/engine/format";
 import { usePbw, useStore } from "@/engine/store";
-import { messages as m } from "@/i18n";
+import { fmt, messages as m } from "@/i18n";
 
 function Readout({
   label,
@@ -57,6 +57,10 @@ function Group({ color, children }: { color: string; children: ReactNode }) {
 
 export function Numerics() {
   const x = useStore((s) => s.metrics);
+  const simv = useStore((s) => {
+    const mode = s.engine?.settings.mode;
+    return mode === "V-SIMV" || mode === "P-SIMV";
+  });
   const measuring = useStore((s) => s.measuring);
   const extraTrace = useStore((s) => s.extraTrace);
   const pbw = usePbw();
@@ -107,14 +111,32 @@ export function Numerics() {
           value={num(x ? x.vte * 1000 : null)}
           unit="mL"
           size="lg"
-          note={x ? `${num((x.vte * 1000) / pbw, 1)} mL/kg PBW` : null}
+          note={
+            !x
+              ? null
+              : simv
+                ? fmt(m.vteByType, {
+                    mandatory: num(x.vteMandatory != null ? x.vteMandatory * 1000 : null),
+                    spontaneous: num(x.vteSpontaneous != null ? x.vteSpontaneous * 1000 : null),
+                  })
+                : `${num((x.vte * 1000) / pbw, 1)} mL/kg PBW`
+          }
         />
         <Readout label="V̇E" value={num(x?.ve, 1)} unit="L/min" size="lg" />
         <Readout
           label="RR total"
           value={num(x?.rrTotal)}
           unit="/min"
-          note={x ? `${num(x.rrSpont)} patient-triggered` : null}
+          note={
+            !x
+              ? null
+              : simv
+                ? fmt(m.rrByType, {
+                    mandatory: num(x.rrMandatory),
+                    spontaneous: num(x.rrTotal - x.rrMandatory),
+                  })
+                : `${num(x.rrSpont)} patient-triggered`
+          }
         />
         <Readout label="I : E" value={ie(x?.ieRatio)} note={x ? `Ti ${num(x.ti, 2)} s` : null} />
         <Readout

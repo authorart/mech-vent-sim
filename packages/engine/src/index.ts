@@ -13,6 +13,7 @@ export {
   TRIGGER_DELAY,
   TRIGGER_LOCKOUT,
   MAX_PSV_INSP_TIME,
+  ASSIST_WINDOW,
   HOLD_TIME,
   MANEUVER_EFFORT_LIMIT,
   PEXP_GAIN,
@@ -66,7 +67,7 @@ export {
   type ProfileValues,
   type Sex,
 } from "./profiles";
-export { INITIAL_SETTINGS, settingsForMode } from "./settings";
+export { INITIAL_SETTINGS, isSimv, settingsForMode } from "./settings";
 export {
   APNEIC_PH,
   SEDATION_FACTOR,

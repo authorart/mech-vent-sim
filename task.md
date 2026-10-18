@@ -3,7 +3,7 @@
 Source specs: [simulation-engine.md](./simulation-engine.md) (the Engine spec) · [Recommended-Simulator-Architecture.md](./Recommended-Simulator-Architecture.md) (stack)
 Domain language: [GLOSSARY.md](./GLOSSARY.md) · Decisions: [docs/adr/](./docs/adr/)
 
-**Status:** ✅ V1 prototype complete 2026-10-17. Live at https://mech-vent-sim.vercel.app. V1 backed up 2026-10-18 (tag `v1.1.0`, branch `v1-backup`, zip `../mech-vent-v1.1.0-backup.zip`). **V1.2 fixes done** (see below). Next: **V2** (Round 6 agreed): **V2 complete** (M9–M15). Waiting for your clinical review of [docs/clinical-review-v2.md](docs/clinical-review-v2.md). **Next: V2.1, V-SIMV and P-SIMV** (Round 7 agreed; V2 backed up as tag `v2.0.0`, branch `v2-backup`, zip `../mech-vent-v2.0.0-backup.zip`). Repo: https://github.com/authorart/mech-vent-sim
+**Status:** ✅ V1 prototype complete 2026-10-17. Live at https://mech-vent-sim.vercel.app. V1 backed up 2026-10-18 (tag `v1.1.0`, branch `v1-backup`, zip `../mech-vent-v1.1.0-backup.zip`). **V1.2 fixes done** (see below). Next: **V2** (Round 6 agreed): **V2 complete** (M9–M15). Waiting for your clinical review of [docs/clinical-review-v2.md](docs/clinical-review-v2.md). **V2.1 complete** (M16: V-SIMV and P-SIMV; V2 backed up first as tag `v2.0.0`, branch `v2-backup`, zip `../mech-vent-v2.0.0-backup.zip`). SIMV values to review: section 8 of the clinical review. Repo: https://github.com/authorart/mech-vent-sim
 
 ---
 
@@ -223,7 +223,7 @@ Each milestone ends with tests passing, the V1 profile signatures re-checked, an
 
 ---
 
-## V2.1: V-SIMV and P-SIMV (planned 2026-10-18, in progress)
+## V2.1: V-SIMV and P-SIMV (planned 2026-10-18, complete 2026-10-18)
 
 **Source:** Hess & Kacmarek ch. 6 (traditional modes, table 6-1, fig. 6-6 to 6-8), ch. 15 (mode asynchrony, fig. 15-10). SIMV gives mandatory breaths (volume- or pressure-controlled) at a set rate, synchronized with the patient's effort through an assist window; between them the patient breathes spontaneously, usually with pressure support. The book's teaching point: at low SIMV rates the patient often works as hard during the mandatory breaths as during the spontaneous ones, so SIMV doesn't really share the work.
 
@@ -240,9 +240,11 @@ Each milestone ends with tests passing, the V1 profile signatures re-checked, an
 | R7-Q7 | What the monitor shows | RR split into **mandatory / spontaneous**, Vte of each type, and each breath marked mandatory or spontaneous (asynchrony classifier and loops keep working) |
 | R7-Q8 | Teaching extras | Add **Mode asynchrony** to the Asynchrony guide: one card showing the patient's effort (esophageal pressure trace) nearly the same on mandatory and spontaneous breaths at a low SIMV rate (fig. 15-10), with the book's fixes (enough support, or another mode) |
 
-### V2.1 milestone (proposed)
+### V2.1 milestone
 
-- [ ] **M16 SIMV**: engine (assist window, mandatory VCV/PCV breaths, pressure-supported spontaneous breaths, breath type on every record) · settings dialog and knobs for both modes · monitor split by breath type · case links · Mode asynchrony card in the guide · tests (assist window timing, set rate guaranteed with no effort, PS breaths between, rate split, mode asynchrony effort similar on both breath types) · phone/desktop check · deploy
+- [x] **M16 SIMV**: engine (assist window, mandatory VCV/PCV breaths, pressure-supported spontaneous breaths, breath type on every record) · settings dialog and knobs for both modes · monitor split by breath type · case links · Mode asynchrony card in the guide · tests (assist window timing, set rate guaranteed with no effort, PS breaths between, rate split, mode asynchrony effort similar on both breath types) · phone/desktop check · deploy
+
+_M16 notes:_ breath type is on every BreathRecord and `breathStart` event; the classifier now credits a trigger to the effort that crossed the threshold, even if it ends during the 80 ms trigger delay (these were mislabeled autotriggers, now double triggers). 167 engine tests.
 
 ### Later (not in V2)
 

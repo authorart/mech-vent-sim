@@ -104,3 +104,24 @@ Known teaching consequences you may want to keep or change:
 - Massive PE's start gives pH ~7.18 (dead space).
 - Normal lungs and central apnea run slightly alkalotic on their starts (pH 7.47–7.51).
 - Neuromuscular weakness on larger breaths is hypocapnic (the book's reason for added dead space).
+
+## 8. SIMV (V2.1, M16)
+
+From `packages/engine/src/simulator.ts` and `settings.ts`. Hess & Kacmarek ch. 6 (fig. 6-6 to 6-8) and ch. 15 (fig. 15-10).
+
+| Item | Value | Note |
+| --- | --- | --- |
+| Assist window | First 25% of each SIMV cycle (60 ÷ SIMV rate) | The book calls the length manufacturer-specific. A trigger in the window gets the Mandatory Breath; with no trigger it comes when the window closes |
+| Cycle grid | Fixed: cycles follow each other every 60 ÷ rate s | A triggered Mandatory Breath doesn't move the next window |
+| Entering SIMV | The last breath counts as the first cycle's Mandatory Breath | The first window opens one cycle after it, so no stacked breath |
+| Spontaneous Breaths | Pressure support (default 5, 0–30; 0 = CPAP), same rise time and Esens rules as PSV | V-SIMV has its own PS rise time; P-SIMV shares one rise time |
+| Starting values | SIMV rate 10, PS 5, Esens 25%; volume or pressure breath carried over from VCV/PCV | |
+| SIMV rate range | 1–40 /min | |
+| Apnea | No Apnea Backup: the SIMV rate guarantees the Mandatory Breaths | Low V̇E / low Vte alarms still apply |
+
+Teaching behavior you may want to check:
+
+- Mode asynchrony comes from the physics: the patient's effort doesn't depend on the breath type. In awake cardiogenic edema at V-SIMV rate 6, muscle effort is the same on every breath and the esophageal swing on the Mandatory Breath is about 80% of the spontaneous one (6.6 vs 8.2 cmH2O), matching fig. 15-10 ("nearly as great").
+- High-drive patients (metabolic acidosis) often re-trigger straight after a short V-SIMV Mandatory Breath: a double trigger, where the spontaneous breath stacks on the mandatory one.
+- A low PS (5) gives small spontaneous breaths (~300 mL in cardiogenic edema), which can set off the low exhaled Vt alarm.
+

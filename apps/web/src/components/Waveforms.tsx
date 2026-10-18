@@ -200,7 +200,9 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
       // Flow starvation (labels on): the same breath with no patient effort, to draw dashed.
       const engineState = useStore.getState().engine;
       let overlay: { starts: number[]; ref: PassiveTemplate } | null = null;
-      if (labels && engineState?.settings.mode === "VCV") {
+      const volumeMode =
+        engineState?.settings.mode === "VCV" || engineState?.settings.mode === "V-SIMV";
+      if (labels && engineState && volumeMode) {
         const starts = asynchronyMarks
           .filter((mk) => mk.kind === "flowStarvation" && onScreen(mk.t) >= 0)
           .map((mk) => breathStartTimes.filter((t) => t <= mk.t).at(-1))

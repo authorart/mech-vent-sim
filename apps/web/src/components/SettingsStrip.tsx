@@ -16,7 +16,7 @@ import { usePbw, useStore } from "@/engine/store";
 import { fmt, messages as m } from "@/i18n";
 import { Knob, Toggle } from "./Knob";
 
-const MODES: Mode[] = ["VCV", "PCV", "PSV"];
+const MODES: Mode[] = ["VCV", "PCV", "PSV", "V-SIMV", "P-SIMV"];
 const MANEUVER_TIMEOUT_MS = 15_000;
 
 /** Every knob for one settings object. `base` marks which values differ (pending). */
@@ -36,6 +36,7 @@ function SettingsEditor({
   layout?: "strip" | "wrap";
 }) {
   const pbw = usePbw();
+  const volumeBreath = value.mode === "VCV" || value.mode === "V-SIMV";
   const changed = (key: string) => base !== null && getValue(base, key) !== getValue(value, key);
   const knob = (spec: KnobSpec) => (
     <Knob
@@ -53,8 +54,8 @@ function SettingsEditor({
         )
       }
       note={
-        spec.key === "tidalVolume" && value.mode === "VCV"
-          ? `${num((value.tidalVolume * 1000) / pbw, 1)} mL/kg`
+        spec.key === "tidalVolume" && volumeBreath
+          ? `${num((getValue(value, "tidalVolume") * 1000) / pbw, 1)} mL/kg`
           : null
       }
     />
@@ -66,7 +67,7 @@ function SettingsEditor({
       className={`flex items-stretch gap-2 ${layout === "strip" ? "flex-nowrap lg:flex-wrap" : "flex-wrap"}`}
     >
       {KNOBS[value.mode].map(knob)}
-      {value.mode === "VCV" && (
+      {(value.mode === "VCV" || value.mode === "V-SIMV") && (
         <Toggle
           label="Flow"
           value={value.flowPattern}
@@ -74,9 +75,12 @@ function SettingsEditor({
             { value: "square", label: "Square" },
             { value: "decelerating", label: "Decel" },
           ]}
-          changed={base?.mode === "VCV" && base.flowPattern !== value.flowPattern}
+          changed={
+            (base?.mode === "VCV" || base?.mode === "V-SIMV") &&
+            base.flowPattern !== value.flowPattern
+          }
           onChange={(flowPattern) =>
-            onChange((s) => (s.mode === "VCV" ? { ...s, flowPattern } : s))
+            onChange((s) => (s.mode === "VCV" || s.mode === "V-SIMV" ? { ...s, flowPattern } : s))
           }
         />
       )}
@@ -148,6 +152,9 @@ function ModeDialog({
         <p className="mb-4 max-w-prose rounded border border-pending/60 px-3 py-2 text-sm text-ink">
           {m.psvNoEffort}
         </p>
+      )}
+      {(mode === "V-SIMV" || mode === "P-SIMV") && (
+        <p className="mb-4 max-w-prose text-sm text-ink-2">{m.simvHint}</p>
       )}
       <SettingsEditor
         value={draft}
@@ -225,11 +232,11 @@ export function SettingsStrip() {
     >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch lg:gap-3">
         {/* Phone: mode + actions on one row. Desktop: these become direct children (lg:contents). */}
-        <div className="flex items-center gap-2 lg:contents">
+        <div className="flex flex-wrap items-center gap-2 lg:contents">
           <div
             role="radiogroup"
             aria-label="Mode"
-            className="flex rounded-md border border-edge bg-panel p-1 lg:flex-col lg:justify-between"
+            className="flex max-w-full shrink-0 overflow-x-auto rounded-md border border-edge bg-panel p-1 lg:grid lg:max-w-none lg:grid-flow-col lg:grid-rows-3 lg:content-between lg:overflow-visible"
           >
             {MODES.map((mode) => (
               <button
@@ -238,7 +245,7 @@ export function SettingsStrip() {
                 role="radio"
                 aria-checked={value.mode === mode}
                 onClick={() => mode !== value.mode && setModeTarget(mode)}
-                className={`rounded px-3 py-1.5 font-readout text-base leading-6 lg:py-0 ${
+                className={`rounded px-2.5 py-1.5 font-readout text-base leading-6 whitespace-nowrap sm:px-3 lg:px-2 lg:py-0 ${
                   value.mode === mode ? "bg-ink text-chrome" : "text-ink-2 hover:bg-panel"
                 }`}
               >

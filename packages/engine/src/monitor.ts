@@ -1,5 +1,5 @@
 import type { AsynchronySummary } from "./asynchrony";
-import type { AsynchronyKind, BreathRecord, BreathTrigger, Mode } from "./types";
+import type { AsynchronyKind, BreathRecord, BreathTrigger, BreathType, Mode } from "./types";
 
 /** A value measured by a maneuver, and when it was measured. */
 export interface Measured {
@@ -15,6 +15,7 @@ export interface BreathMetrics {
   t: number;
   trigger: BreathTrigger;
   mode: Mode;
+  breathType: BreathType;
   ppeak: number;
   pmean: number;
   /** End-expiratory airway pressure (cmH2O). Equals PEEP_e unless a hold was in progress. */
@@ -49,7 +50,13 @@ export interface BreathMetrics {
   /** Minute ventilation: exhaled volume over the last minute (L/min). */
   ve: number;
   rrTotal: number;
+  /** Patient-triggered breaths per minute (Mandatory or Spontaneous). */
   rrSpont: number;
+  /** Mandatory Breaths per minute; the rest of rrTotal are Spontaneous Breaths (SIMV, R7-Q7). */
+  rrMandatory: number;
+  /** Mean exhaled volume of each breath type over the last minute (L); null when there were none. */
+  vteMandatory: number | null;
+  vteSpontaneous: number | null;
   ti: number;
   te: number;
   /** Te / Ti, shown as 1 : x. */
@@ -66,7 +73,7 @@ const MIN_RESISTANCE_FLOW = 0.1;
 
 /** Turns BreathRecords into Breath Metrics, keeping a one-minute rolling window. */
 export class Monitor {
-  private recent: { end: number; vte: number; spont: boolean }[] = [];
+  private recent: { end: number; vte: number; spont: boolean; mandatory: boolean }[] = [];
   private firstStart: number | null = null;
   private pplat: Measured | null = null;
   private totalPeep: Measured | null = null;
@@ -74,7 +81,12 @@ export class Monitor {
 
   update(b: BreathRecord): BreathMetrics {
     this.firstStart ??= b.startTime;
-    this.recent.push({ end: b.endTime, vte: b.vte, spont: b.trigger === "patient" });
+    this.recent.push({
+      end: b.endTime,
+      vte: b.vte,
+      spont: b.trigger === "patient",
+      mandatory: b.breathType === "mandatory",
+    });
     this.recent = this.recent.filter((r) => r.end > b.endTime - WINDOW);
 
     if (b.plateauPaw !== null) {
@@ -102,11 +114,16 @@ export class Monitor {
 
     const ti = b.inspTime;
     const te = b.endTime - b.startTime - ti;
+    const mandatory = this.recent.filter((r) => r.mandatory);
+    const spontaneous = this.recent.filter((r) => !r.mandatory);
+    const meanVte = (rs: { vte: number }[]) =>
+      rs.length > 0 ? rs.reduce((s, r) => s + r.vte, 0) / rs.length : null;
 
     return {
       t: b.endTime,
       trigger: b.trigger,
       mode: b.mode,
+      breathType: b.breathType,
       ppeak: b.peakPaw,
       pmean: b.meanPaw,
       peep: b.totalPeep !== null ? b.peep : b.endExpPaw,
@@ -131,6 +148,9 @@ export class Monitor {
       ve: this.recent.reduce((s, r) => s + r.vte, 0) * perMinute,
       rrTotal: this.recent.length * perMinute,
       rrSpont: this.recent.filter((r) => r.spont).length * perMinute,
+      rrMandatory: mandatory.length * perMinute,
+      vteMandatory: meanVte(mandatory),
+      vteSpontaneous: meanVte(spontaneous),
       ti,
       te,
       ieRatio: ti > 0 ? te / ti : 0,

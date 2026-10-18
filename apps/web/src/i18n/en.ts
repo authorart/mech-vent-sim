@@ -13,10 +13,20 @@ export const en = {
   source: "Source: Hess & Kacmarek, Essentials of Mechanical Ventilation, 3rd ed.",
   showMe: "Show me on the simulator",
   showMeHint: "Loads this patient and settings, with labels on.",
-  exampleCaption: "Example from the simulator, 8 seconds. Markers show what was detected; this card's type is in bold.",
+  exampleCaption:
+    "Example from the simulator, {seconds} seconds. Markers show what was detected; this card's type is in bold.",
+  exampleEffort:
+    "Example from the simulator, {seconds} seconds. Bold: mandatory breaths. Bottom row: esophageal pressure, which dips with each patient effort.",
+  mandatoryShort: "Mandatory",
+  spontaneousShort: "Spont.",
   exampleCompare:
     "Dashed line: the same breath with no patient effort. Shaded: the pressure the patient pulled away, their work against the fixed flow.",
-  family: { Trigger: "Trigger asynchrony", Flow: "Flow asynchrony", Cycle: "Cycle asynchrony" },
+  family: {
+    Trigger: "Trigger asynchrony",
+    Flow: "Flow asynchrony",
+    Cycle: "Cycle asynchrony",
+    Mode: "Mode asynchrony",
+  },
   asynchronyHeading: "Asynchrony",
   labelsOnWaveforms: "Labels on the waveforms",
   labelsHint: "Off by default, so learners read the waveforms themselves.",
@@ -139,7 +149,11 @@ export const en = {
     "This patient is deeply sedated and makes no breathing effort. PSV only supports breaths the patient starts, so after the apnea time the ventilator will switch to Apnea Backup (PCV). Lighten sedation in the Instructor Panel to see PSV cycling.",
   changeMode: "Change mode to {mode}",
   modeDialogHint:
-    "PEEP, FiO₂, trigger and pressure limit carry over. Check the rest before confirming.",
+    "PEEP, FiO₂, trigger and pressure limit carry over, and so do matching breath settings (VCV ⇄ V-SIMV, PCV ⇄ P-SIMV). Check the rest before confirming.",
+  simvHint:
+    "Mandatory breaths come at the SIMV rate, each timed to a patient effort when one comes in the assist window (the first quarter of each cycle). Between them the patient breathes spontaneously, with pressure support (PS 0 = CPAP).",
+  vteByType: "Mand {mandatory} · spont {spontaneous} mL",
+  rrByType: "{mandatory} mand · {spontaneous} spont",
   confirmMode: "Switch to {mode}",
   backupHeading: "Apnea backup (PCV)",
 

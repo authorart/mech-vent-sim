@@ -1,11 +1,20 @@
-import { createProfileSession, SAMPLE, type AsynchronyKind } from "@mech-vent/engine";
+import {
+  createProfileSession,
+  SAMPLE,
+  type AsynchronyKind,
+  type BreathType,
+} from "@mech-vent/engine";
 import type { Example } from "./asynchrony";
 
 export interface ExampleTrace {
   t: number[];
   paw: number[];
   flow: number[];
+  /** Esophageal pressure, for examples that show the patient's effort (else empty). */
+  pes: number[];
   marks: { t: number; kind: AsynchronyKind }[];
+  /** When each breath started, and its type. */
+  breaths: { t: number; type: BreathType }[];
   /**
    * For comparison examples: the airway pressure of the same breath with no patient effort,
    * drawn from each breath's start (Hess & Kacmarek fig. 15-6, the dashed line).
@@ -15,6 +24,8 @@ export interface ExampleTrace {
 
 const SETTLE = 40;
 const SHOWN = 8;
+/** Effort examples (SIMV): start just before a cycle so the stretch opens on a Mandatory Breath. */
+const EFFORT_SETTLE = 39.5;
 
 /** Mean airway pressure against time since breath start, over inspiration, for a passive patient. */
 function passiveBreath(ex: Example): { t: number[]; paw: number[] } {
@@ -46,7 +57,7 @@ function passiveBreath(ex: Example): { t: number[]; paw: number[] } {
 
 /**
  * Run an example on the Engine in the page (about 50 s of simulation in a few milliseconds) and
- * keep 8 s of pressure and flow, with the asynchronies detected in that stretch.
+ * keep 8 s (or the example's own length) of pressure and flow, with the asynchronies detected.
  */
 export function runExample(ex: Example): ExampleTrace {
   const s = createProfileSession(ex.profileId, {
@@ -55,23 +66,34 @@ export function runExample(ex: Example): ExampleTrace {
     noiseSeed: null,
     features: { ...ex.features, breathing: "regular" },
   });
-  s.advance(SETTLE);
-  const step = s.advance(SHOWN);
-  const out: ExampleTrace = { t: [], paw: [], flow: [], marks: [], passive: [] };
+  const settle = ex.showEffort ? EFFORT_SETTLE : SETTLE;
+  s.advance(settle);
+  const step = s.advance(ex.seconds ?? SHOWN);
+  const out: ExampleTrace = {
+    t: [],
+    paw: [],
+    flow: [],
+    pes: [],
+    marks: [],
+    breaths: [],
+    passive: [],
+  };
   const d = step.samples;
   for (let i = 0; i < d.length; i += SAMPLE.STRIDE * 2) {
-    out.t.push(d[i + SAMPLE.T]! - SETTLE);
+    out.t.push(d[i + SAMPLE.T]! - settle);
     out.paw.push(d[i + SAMPLE.PAW]!);
     out.flow.push(d[i + SAMPLE.FLOW]! * 60);
+    if (ex.showEffort) out.pes.push(d[i + SAMPLE.PES]!);
   }
   for (const e of step.events) {
-    if (e.type === "asynchrony") out.marks.push({ t: e.t - SETTLE, kind: e.kind });
+    if (e.type === "asynchrony") out.marks.push({ t: e.t - settle, kind: e.kind });
+    if (e.type === "breathStart") out.breaths.push({ t: e.t - settle, type: e.breathType });
   }
   out.marks.sort((a, b) => a.t - b.t);
   if (ex.comparePassive) {
     const ref = passiveBreath(ex);
     for (const e of step.events) {
-      if (e.type === "breathStart") out.passive.push({ start: e.t - SETTLE, ...ref });
+      if (e.type === "breathStart") out.passive.push({ start: e.t - settle, ...ref });
     }
   }
   return out;

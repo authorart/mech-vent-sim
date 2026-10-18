@@ -4,6 +4,7 @@ import {
   settingsForMode,
   type AsynchronyKind,
   type PatientFeatures,
+  type VsimvSettings,
   type PcvSettings,
   type ProfileId,
   type PsvSettings,
@@ -21,14 +22,21 @@ export interface Example {
   watch: string;
   /** Overlay the same breath with no patient effort (dashed), shading the patient's work. */
   comparePassive?: boolean;
+  /** Show the patient's effort (esophageal pressure) and label breaths by type, not asynchrony. */
+  showEffort?: boolean;
+  /** Seconds shown (default 8). */
+  seconds?: number;
 }
 
+/** The classified asynchronies, plus mode asynchrony (SIMV), which is a pattern, not a breath. */
+export type GuideKind = AsynchronyKind | "modeAsynchrony";
+
 export interface GuideEntry {
-  kind: AsynchronyKind;
+  kind: GuideKind;
   title: string;
   /** Short label drawn on the waveforms. */
   label: string;
-  family: "Trigger" | "Flow" | "Cycle";
+  family: "Trigger" | "Flow" | "Cycle" | "Mode";
   summary: string;
   recognize: string[];
   why: string[];
@@ -43,6 +51,10 @@ const psv = (o: Partial<PsvSettings>): PsvSettings => ({
 });
 const pcv = (o: Partial<PcvSettings>): PcvSettings => ({
   ...(settingsForMode("PCV", INITIAL_SETTINGS) as PcvSettings),
+  ...o,
+});
+const vsimv = (o: Partial<VsimvSettings>): VsimvSettings => ({
+  ...(settingsForMode("V-SIMV", INITIAL_SETTINGS) as VsimvSettings),
   ...o,
 });
 const features = (o: Partial<PatientFeatures> = {}): PatientFeatures => ({
@@ -265,9 +277,44 @@ export const GUIDE: GuideEntry[] = [
         "PCV Ti 2 s: the patient pushes back near the end, so flow turns negative while pressure is still held. Shorten Ti to 1 s.",
     },
   },
+  {
+    kind: "modeAsynchrony",
+    title: "Mode asynchrony",
+    label: "Mode",
+    family: "Mode",
+    summary:
+      "In SIMV the patient often works as hard on the mandatory breaths as on the spontaneous ones, so the mandatory breaths don't rest them.",
+    recognize: [
+      "SIMV: big mandatory breaths at the set rate, smaller spontaneous breaths in between.",
+      "On esophageal pressure, the dip (the patient's effort) on a mandatory breath is nearly as deep as on the spontaneous breaths.",
+      "A patient-triggered V-SIMV breath may show a scooped pressure rise (flow starvation): the patient keeps pulling during it.",
+      "Fast, small spontaneous breaths when the pressure support is low.",
+    ],
+    why: [
+      "The patient's drive doesn't change from breath to breath with the breath type, so the effort is about the same for both.",
+      "SIMV was meant to share the work: the ventilator does the mandatory breaths, the patient the spontaneous ones. This often doesn't happen, particularly at a low SIMV rate.",
+      "At a low SIMV rate most breaths are spontaneous, so total support is low and the drive stays high, during the mandatory breaths too.",
+    ],
+    fix: [
+      "Give enough support: raise the SIMV rate, and set the pressure support so the spontaneous breaths are supported properly.",
+      "Or choose a mode where every breath is the same type: VCV or PCV (assist-control) for full support, PSV for partial support.",
+      "Treat what drives the demand (hypoxemia, acidosis, pain, anxiety).",
+    ],
+    source: "Ch. 6 (SIMV, fig. 6-6 to 6-8), ch. 15 (mode asynchrony, fig. 15-10)",
+    example: {
+      profileId: "cardiogenicEdema",
+      settings: vsimv({ rate: 6 }),
+      sedation: "awake",
+      features: features(),
+      showEffort: true,
+      seconds: 12,
+      watch:
+        "V-SIMV rate 6, PS 5, in a breathless patient, with the esophageal pressure shown as the 4th trace: its dip on the mandatory breath is nearly as deep as on the spontaneous ones. Then switch to VCV, where every breath is a mandatory breath.",
+    },
+  },
 ];
 
 export const GUIDE_BY_KIND = Object.fromEntries(GUIDE.map((g) => [g.kind, g])) as Record<
-  AsynchronyKind,
+  GuideKind,
   GuideEntry
 >;

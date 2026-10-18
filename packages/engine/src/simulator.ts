@@ -1,14 +1,17 @@
-import { PatientEffort, type EffortVariability } from "./effort";
+import { PatientEffort, type ActiveEffort, type EffortVariability } from "./effort";
 import { mulberry32, normalFrom } from "./random";
 import { LinearLung } from "./lung";
+import { isSimv } from "./settings";
 import type {
   BreathRecord,
   AsynchronyKind,
+  BreathKind,
   BreathTrigger,
   CycleReason,
   EngineEvent,
-  Mode,
   Patient,
+  SimvSettings,
+  VcvSettings,
   VentSettings,
 } from "./types";
 
@@ -24,6 +27,11 @@ export const TRIGGER_LOCKOUT = 0.05;
 export const MAX_PSV_INSP_TIME = 3;
 /** Patient-triggered breaths during Apnea Backup that hand control back to PSV. */
 export const BACKUP_EXIT_BREATHS = 2;
+/**
+ * SIMV Assist Window (R7-Q3, Hess & Kacmarek fig. 6-7): the opening fraction of each SIMV cycle in
+ * which a patient trigger gets the Mandatory Breath. The book calls the length manufacturer-specific.
+ */
+export const ASSIST_WINDOW = 0.25;
 /** Duration of an Inspiratory Pause or Expiratory Hold maneuver (s). */
 export const HOLD_TIME = 0.5;
 /** Muscle Pressure above this during a pause or hold makes the measurement unreliable (cmH2O). */
@@ -137,7 +145,7 @@ type Phase = "inspiration" | "pause" | "expiration" | "expiratoryHold";
 interface BreathAccumulator {
   startTime: number;
   trigger: BreathTrigger;
-  mode: Mode;
+  mode: BreathKind;
   inspEnd: number | null;
   vti: number;
   vte: number;
@@ -203,6 +211,11 @@ export class Simulator {
   private lastBreathStart = 0;
   private triggerAt: number | null = null;
   private heldTrigger: BreathTrigger = "mandatory";
+  private heldSpontaneous = false;
+  /** The effort that crossed the trigger: it may end during the trigger delay, before the breath. */
+  private triggerEffort: ActiveEffort | null = null;
+  /** Current SIMV cycle: when it started and whether its Mandatory Breath has been given. */
+  private simv: { cycleStart: number; mandatoryDone: boolean } | null = null;
   private psvPeakFlow = 0;
 
   /** Reverse triggering: passive inflations entrain a patient effort (R6-Q2). */
@@ -734,7 +747,7 @@ export class Simulator {
             peepI: paw - peep,
             reliable,
           });
-          this.startBreath(t, this.heldTrigger);
+          this.startBreath(t, this.heldTrigger, this.heldSpontaneous);
         }
         return;
       case "expiration":
@@ -782,17 +795,26 @@ export class Simulator {
 
   private expirationTransition(t: number, flow: number, paw: number): void {
     // Order: delayed patient trigger, mandatory timing, apnea, then trigger detection.
+    const timing = this.pending ?? this.settings;
+    const simv = isSimv(timing) ? this.simvCycle(t, timing) : null;
     if (this.triggerAt !== null && t >= this.triggerAt - DT / 2) {
       this.triggerAt = null;
-      this.breathDue(t, "patient");
+      // SIMV: a trigger gets the cycle's Mandatory Breath until it has been given.
+      this.breathDue(t, "patient", simv ? simv.mandatoryDone : false);
       return;
     }
 
-    const timing = this.pending ?? this.settings;
-    const rate = this.mandatoryRate(timing);
-    if (rate > 0 && t - this.lastBreathStart >= 60 / rate - DT / 2) {
-      this.breathDue(t, this.backupActive ? "backup" : "mandatory");
-      return;
+    if (simv) {
+      if (!simv.mandatoryDone && t >= simv.windowEnd - DT / 2) {
+        this.breathDue(t, "mandatory");
+        return;
+      }
+    } else {
+      const rate = this.mandatoryRate(timing);
+      if (rate > 0 && t - this.lastBreathStart >= 60 / rate - DT / 2) {
+        this.breathDue(t, this.backupActive ? "backup" : "mandatory");
+        return;
+      }
     }
 
     if (
@@ -810,22 +832,41 @@ export class Simulator {
       const trig = this.settings.trigger;
       const fired =
         trig.type === "flow" ? flow >= trig.threshold : paw <= this.settings.peep - trig.threshold;
-      if (fired) this.triggerAt = t + TRIGGER_DELAY;
+      if (fired) {
+        this.triggerAt = t + TRIGGER_DELAY;
+        this.triggerEffort = this.effort.activeEffort(t);
+      }
     }
   }
 
+  /**
+   * The current SIMV cycle, rolled forward to time t. Each cycle lasts 60 / SIMV rate and opens
+   * with the Assist Window. Entering SIMV, the last breath counts as the first cycle's Mandatory
+   * Breath, so the first window opens one cycle after it.
+   */
+  private simvCycle(t: number, s: SimvSettings): { mandatoryDone: boolean; windowEnd: number } {
+    const period = 60 / s.rate;
+    const c = (this.simv ??= { cycleStart: this.lastBreathStart, mandatoryDone: true });
+    while (t >= c.cycleStart + period - DT / 2) {
+      c.cycleStart += period;
+      c.mandatoryDone = false;
+    }
+    return { mandatoryDone: c.mandatoryDone, windowEnd: c.cycleStart + ASSIST_WINDOW * period };
+  }
+
   /** A breath should start now, unless an Expiratory Hold was requested first. */
-  private breathDue(t: number, trigger: BreathTrigger): void {
+  private breathDue(t: number, trigger: BreathTrigger, spontaneous = false): void {
     if (this.expHoldRequested) {
       this.expHoldRequested = false;
       this.heldTrigger = trigger;
+      this.heldSpontaneous = spontaneous;
       this.phase = "expiratoryHold";
       this.maneuverEffort = 0;
       this.phaseStart = t;
       this.phaseEnd = t + HOLD_TIME;
       return;
     }
-    this.startBreath(t, trigger);
+    this.startBreath(t, trigger, spontaneous);
   }
 
   private mandatoryRate(s: VentSettings): number {
@@ -867,13 +908,20 @@ export class Simulator {
     this.phaseStart = t;
   }
 
-  private startBreath(t: number, trigger: BreathTrigger): void {
+  /** `spontaneous`: in SIMV, a pressure-supported Spontaneous Breath instead of the Mandatory one. */
+  private startBreath(t: number, trigger: BreathTrigger, spontaneous = false): void {
     this.finishBreath(t);
 
     if (this.pending) {
       this.settings = this.pending;
       this.pending = null;
       this.outEvents.push({ type: "settingsApplied", t });
+    }
+    if (isSimv(this.settings)) {
+      this.simv ??= { cycleStart: t, mandatoryDone: false };
+      if (!spontaneous) this.simv.mandatoryDone = true;
+    } else {
+      this.simv = null;
     }
     if (this.backupActive) {
       if (trigger === "patient") this.backupPatientRun++;
@@ -882,10 +930,12 @@ export class Simulator {
         this.endApneaBackup();
       }
     }
-    this.breath = this.resolveBreath(this.settings);
+    this.breath = this.resolveBreath(this.settings, spontaneous);
     // The effort this breath answers (a patient trigger, or an effort already under way).
     this.breathNeuralEnd = this.effort.inspirationEndsAt(t);
-    const effort = this.effort.activeEffort(t);
+    const effort =
+      this.effort.activeEffort(t) ?? (trigger === "patient" ? this.triggerEffort : null);
+    this.triggerEffort = null;
     this.lastBreathEffortId = this.breathEffortId;
     this.breathEffortId = effort?.id ?? null;
     if (this.watched && effort && this.watched.id === effort.id) this.watched.answered = true;
@@ -929,9 +979,13 @@ export class Simulator {
       siP: [],
       maxInspPmus: 0,
     };
-    this.outEvents.push({ type: "breathStart", t, trigger });
+    this.outEvents.push({
+      type: "breathStart",
+      t,
+      trigger,
+      breathType: this.breath.kind === "PSV" ? "spontaneous" : "mandatory",
+    });
     if (trigger === "patient") {
-      const effort = this.effort.activeEffort(t);
       if (effort && this.watched?.id === effort.id) this.watched.triggered = true;
       if (!effort) this.asynchrony(t, "autoTrigger");
       else if (effort.entrained) this.asynchrony(t, "reverseTrigger");
@@ -939,21 +993,20 @@ export class Simulator {
     }
   }
 
-  private resolveBreath(s: VentSettings): ActiveBreath {
+  private resolveBreath(s: VentSettings, spontaneous: boolean): ActiveBreath {
     switch (s.mode) {
-      case "VCV": {
-        const decel = s.flowPattern === "decelerating";
-        const r = FLOW_RAMP_TIME;
-        const v = s.tidalVolume / s.peakFlow;
-        // Flow time that delivers exactly Vt after the opening ramp. Square: Vt/peak + r/2.
-        // Decelerating (ramp up over r, then linear to zero at T): T/2 − r/2 + r²/(6T) = Vt/peak.
-        const tiFlow = decel
-          ? (r + 2 * v + Math.sqrt((r + 2 * v) ** 2 - (4 * r * r) / 3)) / 2
-          : v + r / 2;
-        return { kind: "VCV", tiFlow, pause: s.pauseTime, peakFlow: s.peakFlow, decel };
-      }
+      case "VCV":
+        return volumeBreath(s);
       case "PCV":
         return { kind: "PCV", pInsp: s.pInsp, inspTime: s.inspTime, riseTime: s.riseTime };
+      case "V-SIMV":
+      case "P-SIMV":
+        if (spontaneous) {
+          return { kind: "PSV", pSupport: s.pSupport, riseTime: s.riseTime, esens: s.esens };
+        }
+        return s.mode === "V-SIMV"
+          ? volumeBreath(s)
+          : { kind: "PCV", pInsp: s.pInsp, inspTime: s.inspTime, riseTime: s.riseTime };
       case "PSV":
         if (this.backupActive) {
           return {
@@ -975,6 +1028,7 @@ export class Simulator {
       endTime: t,
       trigger: a.trigger,
       mode: a.mode,
+      breathType: a.mode === "PSV" ? "spontaneous" : "mandatory",
       peep: this.settings.peep,
       inspTime: (a.inspEnd ?? t) - a.startTime,
       vti: a.vti,
@@ -1011,6 +1065,21 @@ export class Simulator {
   get flow(): number {
     return this.lastFlow;
   }
+}
+
+/** A volume-controlled breath (VCV, or a V-SIMV Mandatory Breath). */
+function volumeBreath(
+  s: Pick<VcvSettings, "tidalVolume" | "peakFlow" | "flowPattern" | "pauseTime">,
+): ActiveBreath {
+  const decel = s.flowPattern === "decelerating";
+  const r = FLOW_RAMP_TIME;
+  const v = s.tidalVolume / s.peakFlow;
+  // Flow time that delivers exactly Vt after the opening ramp. Square: Vt/peak + r/2.
+  // Decelerating (ramp up over r, then linear to zero at T): T/2 − r/2 + r²/(6T) = Vt/peak.
+  const tiFlow = decel
+    ? (r + 2 * v + Math.sqrt((r + 2 * v) ** 2 - (4 * r * r) / 3)) / 2
+    : v + r / 2;
+  return { kind: "VCV", tiFlow, pause: s.pauseTime, peakFlow: s.peakFlow, decel };
 }
 
 /**

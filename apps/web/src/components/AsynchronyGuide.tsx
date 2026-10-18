@@ -1,33 +1,45 @@
 "use client";
 
-import type { AsynchronyKind } from "@mech-vent/engine";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/engine/store";
-import { GUIDE, GUIDE_BY_KIND, type GuideEntry } from "@/guide/asynchrony";
+import { GUIDE, GUIDE_BY_KIND, type GuideEntry, type GuideKind } from "@/guide/asynchrony";
 import { runExample, type ExampleTrace } from "@/guide/example";
 import { labelRows, labelWidth } from "@/guide/labels";
-import { messages as m } from "@/i18n";
+import { fmt, messages as m } from "@/i18n";
 
 const W = 640;
 const ROW = 96;
 const GAP = 14;
 const LANE = 14;
 
-/** Pressure and flow of an example, with the detected asynchronies marked. */
-function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: AsynchronyKind }) {
+/**
+ * Pressure and flow of an example, with the detected asynchronies marked. Effort examples add
+ * esophageal pressure and mark breaths by type instead.
+ */
+function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: GuideKind }) {
   const tMax = trace.t.at(-1) ?? 8;
   const x = (t: number) => (t / tMax) * W;
+  const effort = trace.pes.length > 0;
 
   // Event labels in up to three rows above the plot so they never overlap.
-  const labels = trace.marks.map((mk) => ({
-    ...mk,
-    text: GUIDE_BY_KIND[mk.kind].label,
-    x: x(mk.t),
-  }));
+  const labels = effort
+    ? trace.breaths
+        .filter((b) => b.t >= 0)
+        .map((b) => ({
+          text: b.type === "mandatory" ? m.mandatoryShort : m.spontaneousShort,
+          own: b.type === "mandatory",
+          x: x(b.t),
+        }))
+    : trace.marks.map((mk) => ({
+        text: GUIDE_BY_KIND[mk.kind].label,
+        own: mk.kind === focus,
+        x: x(mk.t),
+      }));
   const rows = labelRows(labels.map((l) => ({ x: l.x, width: labelWidth(l.text) })));
   const lanes = Math.max(1, ...rows.map((r) => r + 1));
   const top = lanes * LANE + 8;
-  const H = top + ROW * 2 + GAP + 4;
+  const pesTop = top + ROW * 2 + GAP * 2;
+  const H = (effort ? pesTop + ROW : top + ROW * 2 + GAP) + 4;
 
   const passiveMax = Math.max(0, ...trace.passive.flatMap((p) => p.paw));
   const pHi = Math.max(20, Math.ceil(Math.max(...trace.paw, passiveMax) / 10) * 10);
@@ -35,6 +47,9 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: Asynchrony
   const fAbs = Math.max(30, Math.ceil(Math.max(...trace.flow.map(Math.abs)) / 30) * 30);
   const yP = (p: number) => top + ROW - ((p - pLo) / (pHi - pLo)) * ROW;
   const yF = (f: number) => top + ROW + GAP + ROW / 2 - (f / fAbs) * (ROW / 2);
+  const pesLo = Math.floor(Math.min(0, ...trace.pes));
+  const pesHi = Math.ceil(Math.max(1, ...trace.pes));
+  const yE = (p: number) => pesTop + ROW - ((p - pesLo) / (pesHi - pesLo)) * ROW;
   const line = (ys: number[], y: (v: number) => number) =>
     ys.map((v, i) => `${x(trace.t[i]!).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   const pawAt = (t: number) => {
@@ -60,18 +75,28 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: Asynchrony
       viewBox={`0 0 ${W} ${H}`}
       className="h-auto w-full"
       role="img"
-      aria-label={`Example pressure and flow traces with ${trace.marks.length} detected events.`}
+      aria-label={
+        effort
+          ? `Example pressure, flow and esophageal pressure traces over ${trace.breaths.length} breaths.`
+          : `Example pressure and flow traces with ${trace.marks.length} detected events.`
+      }
     >
       <line x1="0" x2={W} y1={yF(0)} y2={yF(0)} stroke="var(--grid)" />
       <line x1="0" x2={W} y1={yP(0)} y2={yP(0)} stroke="var(--grid)" />
-      <text x="4" y={top + 11} fill="var(--ink-3)" fontSize="11">
-        Paw {pHi} cmH₂O
-      </text>
-      <text x="4" y={top + ROW + GAP + 11} fill="var(--ink-3)" fontSize="11">
-        Flow ±{fAbs} L/min
-      </text>
+      {effort && (
+        <>
+          <line x1="0" x2={W} y1={yE(0)} y2={yE(0)} stroke="var(--grid)" />
+          <polyline
+            points={line(trace.pes, yE)}
+            fill="none"
+            stroke="var(--trace-aux)"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+        </>
+      )}
       {labels.map((l, i) => {
-        const own = l.kind === focus;
+        const own = l.own;
         const y = (rows[i] ?? 0) * LANE + 11;
         return (
           <g key={i}>
@@ -123,6 +148,27 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: Asynchrony
         strokeWidth="2"
         strokeLinejoin="round"
       />
+      {/* Axis names last, with a halo, so marker lines and traces never run through them. */}
+      <g
+        fill="var(--ink-3)"
+        fontSize="11"
+        stroke="var(--glass)"
+        strokeWidth="4"
+        strokeLinejoin="round"
+        paintOrder="stroke"
+      >
+        <text x="4" y={top + 11}>
+          Paw {pHi} cmH₂O
+        </text>
+        <text x="4" y={top + ROW + GAP + 11}>
+          Flow ±{fAbs} L/min
+        </text>
+        {effort && (
+          <text x="4" y={pesTop + 11}>
+            Pes {pesLo} to {pesHi} cmH₂O
+          </text>
+        )}
+      </g>
     </svg>
   );
 }
@@ -150,7 +196,10 @@ function Card({ entry, onShow }: { entry: GuideEntry; onShow: () => void }) {
       <figure className="rounded-md border border-edge bg-glass p-2">
         <ExampleChart trace={trace} focus={entry.kind} />
         <figcaption className="px-1 pt-1 text-xs text-ink-3">
-          {m.exampleCaption} {entry.example.comparePassive && m.exampleCompare}
+          {fmt(entry.example.showEffort ? m.exampleEffort : m.exampleCaption, {
+            seconds: entry.example.seconds ?? 8,
+          })}{" "}
+          {entry.example.comparePassive && m.exampleCompare}
         </figcaption>
       </figure>
       <div className="grid gap-5 md:grid-cols-3">
@@ -179,7 +228,7 @@ function Card({ entry, onShow }: { entry: GuideEntry; onShow: () => void }) {
 export function AsynchronyGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const send = useStore((s) => s.send);
-  const [kind, setKind] = useState(GUIDE[0]!.kind);
+  const [kind, setKind] = useState<GuideKind>(GUIDE[0]!.kind);
 
   useEffect(() => {
     const d = ref.current;
@@ -194,6 +243,7 @@ export function AsynchronyGuide({ open, onClose }: { open: boolean; onClose: () 
     send({ type: "setSedation", level: ex.sedation });
     send({ type: "setPatientFeatures", features: ex.features });
     useStore.setState({ showLabels: true });
+    if (ex.showEffort) useStore.setState({ extraTrace: "pes" });
     onClose();
   };
 

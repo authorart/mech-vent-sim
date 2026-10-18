@@ -225,6 +225,26 @@ _Avoid_: air hunger (that's a symptom, not a waveform)
 The fraction of peak inspiratory flow at which a pressure-support breath cycles to expiration.
 _Avoid_: cycle-off %, ETS
 
+**Mandatory Breath**:
+A breath whose size and length the ventilator sets (volume- or pressure-controlled), whether the ventilator or the patient starts it.
+_Avoid_: controlled breath, machine breath
+
+**Spontaneous Breath**:
+A breath the patient starts and ends, with the size and length the patient chooses; the ventilator may support it with pressure.
+_Avoid_: patient-triggered breath (a Mandatory Breath can be patient-triggered too)
+
+**SIMV**:
+Synchronized intermittent mandatory ventilation: Mandatory Breaths at a set rate, each synchronized with a patient effort when one comes, and Spontaneous Breaths in between. V-SIMV gives volume-controlled Mandatory Breaths, P-SIMV pressure-controlled ones.
+_Avoid_: IMV (unsynchronized), VC-SIMV / PC-SIMV in the interface (the book's names)
+
+**Assist Window**:
+The opening part of each SIMV cycle in which a patient effort triggers the cycle's Mandatory Breath; if no effort comes before it closes, the ventilator delivers the Mandatory Breath then.
+_Avoid_: trigger window
+
+**Mode Asynchrony**:
+The patient making the same effort on Mandatory and Spontaneous Breaths in SIMV, because breathing effort can't switch breath by breath; the Mandatory Breaths don't rest the muscles.
+_Avoid_: SIMV dyssynchrony
+
 **Apnea Backup**:
 The mandatory ventilation that takes over automatically when no breath has occurred within the apnea time during a spontaneous mode.
 _Avoid_: backup mode, rescue
