@@ -107,7 +107,11 @@ export const en = {
   },
   priority: { high: "High priority", medium: "Medium priority" },
 
-  trace: { pressure: "Paw", flow: "Flow", volume: "Volume" },
+  trace: { pressure: "Paw", flow: "Flow", volume: "Volume", pes: "Pes", co2: "CO₂" },
+  extraTrace: "4th trace",
+  extraTraceOption: { off: "None", pes: "Esophageal pressure", co2: "CO₂ (capnogram)" },
+  esophagealHeading: "Esophageal balloon",
+  pesHint: { endExp: "end-expiratory", endInsp: "end-inspiratory" },
   waveforms: "Waveforms",
   loops: "Loops",
   pvLoop: "Pressure–volume",

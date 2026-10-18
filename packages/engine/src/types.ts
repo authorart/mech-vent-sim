@@ -247,5 +247,7 @@ export const SAMPLE = {
   PEXP: 6,
   /** Esophageal (pleural) pressure (cmH2O, M11). */
   PES: 7,
-  STRIDE: 8,
+  /** Airway CO2 (mmHg): the capnogram (M15). */
+  CO2: 8,
+  STRIDE: 9,
 } as const;

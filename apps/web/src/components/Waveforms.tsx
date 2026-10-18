@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { num } from "@/engine/format";
 import { SWEEP_SECONDS } from "@/engine/ring";
 import { asynchronyMarks, sweep, useStore } from "@/engine/store";
 import { GUIDE_BY_KIND } from "@/guide/asynchrony";
 import { messages as m } from "@/i18n";
 
-type Channel = "paw" | "flow" | "volume";
+type Channel = "paw" | "flow" | "volume" | "pes" | "co2";
 
 interface Row {
   channel: Channel;
@@ -57,6 +57,26 @@ const ROWS: Row[] = [
   },
 ];
 
+/** The optional 4th rows (M15): esophageal pressure or the capnogram. */
+const EXTRA_ROWS: Record<"pes" | "co2", Row> = {
+  pes: {
+    channel: "pes",
+    label: m.trace.pes,
+    unit: "cmH₂O",
+    color: "--trace-aux",
+    decimals: 1,
+    range: (lo, hi) => [Math.floor((lo - 2) / 5) * 5, Math.ceil((hi + 2) / 5) * 5],
+  },
+  co2: {
+    channel: "co2",
+    label: m.trace.co2,
+    unit: "mmHg",
+    color: "--trace-aux",
+    decimals: 0,
+    range: (_lo, hi) => [0, nice(hi + 5, [40, 50, 60, 80, 100, 150])],
+  },
+};
+
 const AXIS_W = 44;
 const ROW_GAP = 10;
 
@@ -71,8 +91,14 @@ function extent(a: Float32Array): [number, number] {
   return Number.isFinite(lo) ? [lo, hi] : [0, 1];
 }
 
-/** Three stacked sweep traces, drawn like a bedside monitor. */
+/** Stacked sweep traces (three, or four with the optional row), drawn like a bedside monitor. */
 export function Waveforms({ frozen }: { frozen: boolean }) {
+  const extra = useStore((s) => s.extraTrace);
+  const rows = useMemo(() => (extra === "off" ? ROWS : [...ROWS, EXTRA_ROWS[extra]]), [extra]);
+  const rowsRef = useRef(rows);
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
@@ -81,6 +107,8 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
     paw: number;
     flow: number;
     volume: number;
+    pes: number;
+    co2: number;
   } | null>(null);
   const [width, setWidth] = useState(0);
   const cursorRef = useRef<{ x: number; y: number } | null>(null);
@@ -131,19 +159,29 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
     let lastVersion = -1;
     let lastCursor: { x: number; y: number } | null = null;
     let lastLabels = false;
+    let lastRows: Row[] | null = null;
     let raf = 0;
 
     const draw = () => {
       raf = requestAnimationFrame(draw);
       const cur = cursorRef.current;
       const labels = useStore.getState().showLabels;
-      if (sweep.version === lastVersion && cur === lastCursor && labels === lastLabels) return;
+      const rowList = rowsRef.current;
+      if (
+        sweep.version === lastVersion &&
+        cur === lastCursor &&
+        labels === lastLabels &&
+        rowList === lastRows
+      ) {
+        return;
+      }
       lastVersion = sweep.version;
       lastCursor = cur;
       lastLabels = labels;
+      lastRows = rowList;
 
       ctx.clearRect(0, 0, w, h);
-      const rowH = (h - ROW_GAP * (ROWS.length - 1)) / ROWS.length;
+      const rowH = (h - ROW_GAP * (rowList.length - 1)) / rowList.length;
       const plotW = w - AXIS_W;
       const n = sweep.size;
       const xAt = (i: number) => AXIS_W + (i / (n - 1)) * plotW;
@@ -151,7 +189,7 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
       ctx.font = `12px ${family}`;
       ctx.textBaseline = "middle";
 
-      ROWS.forEach((row, r) => {
+      rowList.forEach((row, r) => {
         const top = r * (rowH + ROW_GAP);
         const data = sweep[row.channel];
         const [lo, hi] = row.range(...extent(data));
@@ -249,7 +287,14 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
         setReadout(
           t === undefined || !Number.isFinite(t)
             ? null
-            : { t, paw: sweep.paw[i]!, flow: sweep.flow[i]!, volume: sweep.volume[i]! },
+            : {
+                t,
+                paw: sweep.paw[i]!,
+                flow: sweep.flow[i]!,
+                volume: sweep.volume[i]!,
+                pes: sweep.pes[i]!,
+                co2: sweep.co2[i]!,
+              },
         );
       }
     };
@@ -276,7 +321,7 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
       <canvas
         ref={canvasRef}
         role="img"
-        aria-label={`Airway pressure, flow and volume over the last ${SWEEP_SECONDS} seconds. Values are listed in the numbers panel.`}
+        aria-label={`Airway pressure, flow and volume${extra === "pes" ? ", esophageal pressure" : extra === "co2" ? ", CO2" : ""} over the last ${SWEEP_SECONDS} seconds. Values are listed in the numbers panel.`}
         className="absolute inset-0"
       />
       {cursor && readout && (
@@ -288,7 +333,7 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
           }}
         >
           <div className="mb-1 text-xs text-ink-3 tabular">t = {num(readout.t, 2)} s</div>
-          {ROWS.map((row) => (
+          {rows.map((row) => (
             <div key={row.channel} className="flex items-center gap-2 tabular">
               <span className="h-0.5 w-3" style={{ background: `var(${row.color})` }} />
               <span className="w-14 text-ink-2">{row.label}</span>

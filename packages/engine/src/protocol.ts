@@ -11,7 +11,7 @@ import type { ScenarioEvent, ScenarioEventKind } from "./scenario";
 import type { Drive, EngineEvent, Mechanics, VentSettings } from "./types";
 import type { CirculationParams, Vitals } from "./vitals";
 
-export const ENGINE_CONTRACT_VERSION = 6;
+export const ENGINE_CONTRACT_VERSION = 7;
 
 /** Instructor Panel changes; each field is merged into the running patient. */
 export interface ProfilePatch {

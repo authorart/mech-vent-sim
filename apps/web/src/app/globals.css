@@ -16,6 +16,8 @@
   --trace-pressure: #c08a1e;
   --trace-flow: #18977e;
   --trace-volume: #6c7cf0;
+  /* Optional 4th trace (esophageal pressure or CO2), validated with the three above (M15). */
+  --trace-aux: #c25a9e;
   --pending: #4db8e8;
   --alarm-high: #e5484d;
   --alarm-medium: #f5d90a;

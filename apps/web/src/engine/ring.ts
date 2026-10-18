@@ -16,6 +16,9 @@ export class SweepBuffer {
   readonly paw = new Float32Array(this.size).fill(NaN);
   readonly flow = new Float32Array(this.size).fill(NaN);
   readonly volume = new Float32Array(this.size).fill(NaN);
+  /** Optional 4th-trace channels (M15). */
+  readonly pes = new Float32Array(this.size).fill(NaN);
+  readonly co2 = new Float32Array(this.size).fill(NaN);
   /** Index of the newest sample. */
   head = -1;
   frozen = false;
@@ -39,6 +42,8 @@ export class SweepBuffer {
       const paw = data[i + SAMPLE.PAW]!;
       const flow = data[i + SAMPLE.FLOW]! * 60; // L/s → L/min
       const volume = data[i + SAMPLE.VOLUME]! * 1000; // L → mL
+      const pes = data[i + SAMPLE.PES]!;
+      const co2 = data[i + SAMPLE.CO2]!;
 
       while (this.breathStarts.length > 0 && t >= this.breathStarts[0]! - 1e-6) {
         this.breathStarts.shift();
@@ -56,6 +61,8 @@ export class SweepBuffer {
       this.paw[idx] = paw;
       this.flow[idx] = flow;
       this.volume[idx] = volume;
+      this.pes[idx] = pes;
+      this.co2[idx] = co2;
       // Clear the erase bar ahead of the write position.
       const gap = Math.round(ERASE_SECONDS * RATE);
       for (let g = 1; g <= gap; g++) {
@@ -64,6 +71,8 @@ export class SweepBuffer {
         this.paw[j] = NaN;
         this.flow[j] = NaN;
         this.volume[j] = NaN;
+        this.pes[j] = NaN;
+        this.co2[j] = NaN;
       }
       this.head = idx;
     }
@@ -71,7 +80,7 @@ export class SweepBuffer {
   }
 
   clear(): void {
-    for (const a of [this.t, this.paw, this.flow, this.volume]) a.fill(NaN);
+    for (const a of [this.t, this.paw, this.flow, this.volume, this.pes, this.co2]) a.fill(NaN);
     this.head = -1;
     this.loop = { paw: [], flow: [], volume: [] };
     this.previousLoop = null;

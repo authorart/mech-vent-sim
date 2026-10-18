@@ -45,6 +45,8 @@ interface Store {
   showLabels: boolean;
   /** Show the Targets card to learners (instructor's choice, R6-Q11). */
   showTargets: boolean;
+  /** Optional 4th waveform (M15). */
+  extraTrace: ExtraTrace;
   /** Dynamic compliance collected per PEEP for a decremental PEEP trial (M14). */
   peepTrial: Record<string, { cdyn: number[]; stressIndex: number | null }>;
 
@@ -53,6 +55,8 @@ interface Store {
   receive: (msg: EngineMessage) => void;
   setPatientSize: (sex: Sex, heightCm: number) => void;
 }
+
+export type ExtraTrace = "off" | "pes" | "co2";
 
 export interface AsynchronyMark {
   t: number;
@@ -87,6 +91,7 @@ export const useStore = create<Store>((set, get) => ({
   asynchronyLog: [],
   showLabels: false,
   showTargets: false,
+  extraTrace: "off",
   peepTrial: {},
 
   send: () => {},

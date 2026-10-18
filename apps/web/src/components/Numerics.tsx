@@ -58,6 +58,7 @@ function Group({ color, children }: { color: string; children: ReactNode }) {
 export function Numerics() {
   const x = useStore((s) => s.metrics);
   const measuring = useStore((s) => s.measuring);
+  const extraTrace = useStore((s) => s.extraTrace);
   const pbw = usePbw();
 
   const unreliable = (v: Measured | null) =>
@@ -140,6 +141,35 @@ export function Numerics() {
           }
         />
       </Group>
+
+      {extraTrace === "pes" && x && (
+        <Group color="--trace-aux">
+          <Readout
+            label="Pes"
+            value={num(x.esophageal.pesEndExp, 1)}
+            unit="cmH₂O"
+            note={m.pesHint.endExp}
+          />
+          <Readout
+            label="Pes"
+            value={num(x.esophageal.pesEndInsp, 1)}
+            unit="cmH₂O"
+            note={m.pesHint.endInsp}
+          />
+          <Readout
+            label="P transpulm."
+            value={num(x.esophageal.plEndExp, 1)}
+            unit="cmH₂O"
+            note={m.pesHint.endExp}
+          />
+          <Readout
+            label="P transpulm."
+            value={num(x.esophageal.plEndInsp, 1)}
+            unit="cmH₂O"
+            note={m.pesHint.endInsp}
+          />
+        </Group>
+      )}
     </div>
   );
 }

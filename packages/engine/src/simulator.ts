@@ -97,6 +97,14 @@ export const ASYNC_PREMATURE_PMUS = 2.5;
 /** Secretions (M13): sawtooth on the displayed traces, scaled by airflow. */
 export const SECRETION_SAW = { hz: 9, paw: 0.8, flow: 0.1 };
 
+/**
+ * Capnogram (M15, Hess & Kacmarek ch. 28). Exhaled gas reads zero while the anatomic dead space
+ * leaves (phase I), rises steeply (phase II, width in L) and then forms the alveolar plateau
+ * (phase III), which slopes up more when expiratory resistance is high (uneven emptying).
+ */
+export const CAPNO_PHASE2_WIDTH = 0.025;
+export const CAPNO_SLOPE = { min: 0.03, perResistance: 0.012, max: 0.4 };
+
 /** Displayed-signal noise (1 SD): pressure cmH2O, flow L/s. Physics and metrics stay noise-free. */
 export const SIGNAL_NOISE = { paw: 0.04, flow: 0.004 };
 
@@ -236,6 +244,14 @@ export class Simulator {
   fistulaLeak = 0;
   /** Secretions in the airway (0–1), for the sawtooth on the displayed traces. */
   secretions = 0;
+
+  /** End-tidal CO2 and anatomic dead space (L) from gas exchange, for the capnogram. */
+  etco2 = 0;
+  deadSpace = 0.125;
+  /** Volume exhaled so far this expiration (L), and the last breath's exhaled volume. */
+  private exhaled = 0;
+  private lastExhaled = 0.5;
+  private co2 = 0;
 
   /** Largest Muscle Pressure seen during the current pause or hold. */
   private maneuverEffort = 0;
@@ -392,10 +408,12 @@ export class Simulator {
         pmus,
         this.pexp,
         this.lung.pleuralPressure(this.volume, pmus, this.pexp) + this.pcard,
+        this.co2,
       );
     }
     this.lung.step(DT, this.lung.recoil(this.volume), flow);
     this.collectStressIndex(t, paw, pmus);
+    this.updateCapnogram(flow);
     this.updateExpiratoryMuscles(t);
     this.updateCardiac();
     this.watchEffort(t, pmus, paw);
@@ -440,6 +458,25 @@ export class Simulator {
     const target = overrun && !this.effort.inspiring(t) ? PEXP_GAIN * this.effort.drive.pmusMax : 0;
     const tau = target > this.pexp ? PEXP_RISE : PEXP_FALL;
     this.pexp += (target - this.pexp) * Math.min(1, DT / tau);
+  }
+
+  /** Airway CO2 for this step: zero on inspiration, phases I–III on expiration. */
+  private updateCapnogram(flow: number): void {
+    if (this.phase === "inspiration") {
+      // Fresh gas washes the sensor out within a few tens of milliseconds.
+      this.co2 = flow > 0.02 ? this.co2 * 0.8 : this.co2;
+      return;
+    }
+    if (this.phase !== "expiration" || flow >= 0) return; // holds and pauses keep the last value
+    this.exhaled -= flow * DT;
+    const phase2 = 1 / (1 + Math.exp(-(this.exhaled - this.deadSpace) / (CAPNO_PHASE2_WIDTH / 4)));
+    const r = this.lung.expiratoryResistance(this.volume);
+    const slope = Math.min(
+      CAPNO_SLOPE.max,
+      Math.max(CAPNO_SLOPE.min, CAPNO_SLOPE.min + CAPNO_SLOPE.perResistance * (r - 5)),
+    );
+    const progress = Math.min(1, this.exhaled / Math.max(this.lastExhaled, this.deadSpace + 0.05));
+    this.co2 = this.etco2 * phase2 * (1 - slope * (1 - progress));
   }
 
   /** The heart beating against the lungs: a small pressure ripple at the heart rate. */
@@ -823,6 +860,8 @@ export class Simulator {
 
   private beginExpiration(t: number): void {
     if (this.acc) this.acc.inspEnd = t;
+    if (this.exhaled > 0.05) this.lastExhaled = this.exhaled;
+    this.exhaled = 0;
     this.classifyCycling(t);
     this.phase = "expiration";
     this.phaseStart = t;

@@ -3,6 +3,6 @@ import { ENGINE_CONTRACT_VERSION } from "./index";
 
 describe("engine package", () => {
   it("exposes the contract version", () => {
-    expect(ENGINE_CONTRACT_VERSION).toBe(6);
+    expect(ENGINE_CONTRACT_VERSION).toBe(7);
   });
 });

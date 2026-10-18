@@ -276,6 +276,8 @@ export class Session {
     const scenarioEvents = this.applyScenario(this.sim.time);
     this.updateDrive();
     this.sim.heartRate = this.circulation.state?.hr ?? this.circulation.params.hr;
+    this.sim.etco2 = this.gas.state?.etco2 ?? 0;
+    this.sim.deadSpace = this.baseGas.anatomicDeadSpace;
     const r = this.sim.advance(seconds);
     r.events.unshift(...scenarioEvents);
     const alarms: AlarmEvent[] = [];

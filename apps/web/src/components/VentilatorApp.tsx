@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useEngine } from "@/engine/useEngine";
-import { useStore } from "@/engine/store";
+import { useStore, type ExtraTrace } from "@/engine/store";
 import { fmt, messages as m } from "@/i18n";
 import { AsynchronyGuide } from "./AsynchronyGuide";
 import { InstructorPanel } from "./InstructorPanel";
@@ -21,6 +21,7 @@ export function VentilatorApp() {
   const backup = useStore((s) => s.engine?.apneaBackupActive);
   const paused = useStore((s) => s.engine?.paused);
   const showTargets = useStore((s) => s.showTargets);
+  const extraTrace = useStore((s) => s.extraTrace);
   const [view, setView] = useState<"waveforms" | "loops">("waveforms");
   const [frozen, setFrozen] = useState(false);
   const [instructor, setInstructor] = useState(false);
@@ -65,11 +66,28 @@ export function VentilatorApp() {
               ))}
             </div>
             {view === "waveforms" && (
+              <label className="ml-auto flex items-center gap-1.5 text-sm text-ink-2">
+                <span className="hidden sm:inline">{m.extraTrace}</span>
+                <select
+                  aria-label={m.extraTrace}
+                  value={extraTrace}
+                  onChange={(e) => useStore.setState({ extraTrace: e.target.value as ExtraTrace })}
+                  className="rounded border border-edge bg-panel px-1.5 py-1 text-ink"
+                >
+                  {(["off", "pes", "co2"] as const).map((v) => (
+                    <option key={v} value={v}>
+                      {m.extraTraceOption[v]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {view === "waveforms" && (
               <button
                 type="button"
                 aria-pressed={frozen}
                 onClick={() => setFrozen((f) => !f)}
-                className={`ml-auto rounded border px-3 py-1 text-sm ${
+                className={`rounded border px-3 py-1 text-sm ${
                   frozen ? "border-pending text-pending" : "border-edge text-ink-2 hover:text-ink"
                 }`}
               >
