@@ -66,8 +66,12 @@ export const SERVO_MAX_FLOW = 3;
 export const SERVO_MIN_RISE = 0.02;
 export const SERVO_NATURAL_FREQ = 80; // rad/s
 export const SERVO_DAMPING = 0.5;
-/** The valve can cut flow no faster than this (L/s²): a sudden drop in demand briefly overshoots pressure. */
-export const SERVO_MAX_DECEL = 12;
+/**
+ * The valve cuts flow no faster than SERVO_MAX_DECEL + ventFlow/SERVO_CLOSE_TIME (L/s²): a sudden
+ * drop in demand, such as the patient pushing back, briefly overshoots pressure.
+ */
+export const SERVO_MAX_DECEL = 6;
+export const SERVO_CLOSE_TIME = 0.15;
 /** The active exhalation valve vents gas once airway pressure passes the target by this much. */
 export const RELIEF_PRESSURE = 4;
 /** PSV secondary cycle criterion: airway pressure this far above target ends the breath. */
@@ -124,6 +128,9 @@ interface BreathAccumulator {
   cycleFlow: number;
   highPressureCycled: boolean;
   cycle: CycleReason;
+  siT: number[];
+  siP: number[];
+  maxInspPmus: number;
 }
 
 export interface SimulatorOptions {
@@ -204,6 +211,7 @@ export class Simulator {
       opts.firstEffortAt ?? 1,
       opts.variability ?? null,
     );
+    this.lung.settle(this.settings.peep);
     this.volume = this.lung.volumeAtPressure(this.settings.peep);
     if (opts.noiseSeed != null) this.noise = normalFrom(mulberry32(opts.noiseSeed));
     this.lastPaw = this.settings.peep;
@@ -326,8 +334,11 @@ export class Simulator {
         palv,
         pmus,
         this.pexp,
+        this.lung.pleuralPressure(this.volume, pmus, this.pexp) + this.pcard,
       );
     }
+    this.lung.step(DT, this.lung.recoil(this.volume), flow);
+    this.collectStressIndex(t, paw, pmus);
     this.updateExpiratoryMuscles(t);
     this.updateCardiac();
 
@@ -336,7 +347,12 @@ export class Simulator {
 
   /** Elastic recoil pressure (cmH2O): alveolar pressure with no effort. */
   private get recoil(): number {
-    return this.lung.alveolarPressure(this.volume, 0);
+    return this.lung.recoil(this.volume);
+  }
+
+  /** Fraction of the recruitable lung open (engine truth). */
+  get recruited(): number {
+    return this.lung.recruited;
   }
 
   /**
@@ -378,7 +394,8 @@ export class Simulator {
     const command = Math.min(need, cap);
     const w = SERVO_NATURAL_FREQ;
     const accel = w * w * (command - this.ventFlow) - 2 * SERVO_DAMPING * w * this.ventFlowRate;
-    this.ventFlowRate = Math.max(-SERVO_MAX_DECEL, this.ventFlowRate + accel * DT);
+    const maxDecel = SERVO_MAX_DECEL + this.ventFlow / SERVO_CLOSE_TIME;
+    this.ventFlowRate = Math.max(-maxDecel, this.ventFlowRate + accel * DT);
     this.ventFlow += this.ventFlowRate * DT;
     if (this.ventFlow < 0) {
       this.ventFlow = 0;
@@ -434,9 +451,29 @@ export class Simulator {
 
   /** Flow through the patient and the expiratory circuit in series, with the valve held at PEEP. */
   private expiratoryFlow(peep: number, v: number, pmus: number, t: number): number {
-    const drive = peep - this.lung.alveolarPressure(v, pmus);
-    const r = drive >= 0 ? this.lung.mechanics.rInsp : this.lung.expiratoryResistance(v);
-    return drive / (r + this.circuitResistance(t));
+    const palv = this.lung.alveolarPressure(v, pmus);
+    const rc = this.circuitResistance(t);
+    if (peep >= palv) return (peep - palv) / (this.lung.mechanics.rInsp + rc);
+    const r = this.lung.expiratoryResistance(v);
+    const q = (palv - peep) / (r + rc);
+    // Waterfall (COPD): if airway pressure would sit below the critical pressure, the collapsed
+    // airways set the flow instead, and PEEP up to that pressure makes no difference.
+    const pcrit = this.lung.criticalPressure;
+    if (peep + rc * q >= pcrit) return -q;
+    return -Math.max(0, palv - pcrit) / r;
+  }
+
+  /** Paw samples of a constant-flow VCV inspiration, for the stress index. */
+  private collectStressIndex(t: number, paw: number, pmus: number): void {
+    const a = this.acc;
+    const b = this.breath;
+    if (!a || !b || b.kind !== "VCV" || b.decel || this.phase !== "inspiration") return;
+    a.maxInspPmus = Math.max(a.maxInspPmus, pmus);
+    const tIn = t - this.phaseStart;
+    if (tIn >= FLOW_RAMP_TIME + 0.03 && tIn <= b.tiFlow - DT && this.step % OUTPUT_EVERY === 0) {
+      a.siT.push(tIn);
+      a.siP.push(paw);
+    }
   }
 
   private control(): Control {
@@ -675,6 +712,9 @@ export class Simulator {
       cycleFlow: 0,
       highPressureCycled: false,
       cycle: "time",
+      siT: [],
+      siP: [],
+      maxInspPmus: 0,
     };
     this.outEvents.push({ type: "breathStart", t, trigger });
   }
@@ -733,6 +773,11 @@ export class Simulator {
       cycleFlow: a.cycleFlow,
       highPressureCycled: a.highPressureCycled,
       cycle: a.cycle,
+      stressIndex:
+        a.siT.length >= 8 && a.maxInspPmus < 0.5 && !a.highPressureCycled
+          ? stressIndex(a.siT, a.siP)
+          : null,
+      endExpRecruited: this.lung.recruited,
     });
     this.acc = null;
   }
@@ -741,4 +786,30 @@ export class Simulator {
   get flow(): number {
     return this.lastFlow;
   }
+}
+
+/**
+ * Stress index (Hess & Kacmarek ch. 31): fit Paw = a·tᵇ + c over the constant-flow part of a
+ * passive VCV inspiration and return b. A grid over b with least squares for a and c is enough.
+ */
+export function stressIndex(t: number[], p: number[]): number {
+  let best = { b: 1, sse: Infinity };
+  for (let b = 0.4; b <= 2.5001; b += 0.01) {
+    const x = t.map((ti) => Math.pow(ti, b));
+    const n = x.length;
+    const mx = x.reduce((s, v) => s + v, 0) / n;
+    const mp = p.reduce((s, v) => s + v, 0) / n;
+    let sxx = 0;
+    let sxp = 0;
+    for (let i = 0; i < n; i++) {
+      sxx += (x[i]! - mx) ** 2;
+      sxp += (x[i]! - mx) * (p[i]! - mp);
+    }
+    const a = sxx > 0 ? sxp / sxx : 0;
+    const c = mp - a * mx;
+    let sse = 0;
+    for (let i = 0; i < n; i++) sse += (p[i]! - (a * x[i]! + c)) ** 2;
+    if (sse < best.sse) best = { b, sse };
+  }
+  return Math.round(best.b * 100) / 100;
 }

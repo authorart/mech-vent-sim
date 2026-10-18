@@ -1,6 +1,6 @@
 import type { SedationLevel } from "./drive";
 import type { GasParams } from "./gas";
-import type { Patient } from "./types";
+import type { Mechanics, Patient } from "./types";
 import type { CirculationParams } from "./vitals";
 
 export type ProfileId =
@@ -58,6 +58,8 @@ export interface ProfileValues {
   overdistensionStiffness?: number;
   /** Sedation level the profile opens with (default deep, R4-Q1). */
   startSedation?: SedationLevel;
+  /** Further lung mechanics (M11): flow limitation, recruitment, viscoelasticity, chest wall. */
+  lung?: Partial<Mechanics>;
 }
 
 export const ANATOMIC_DEAD_SPACE = 0.125;
@@ -91,6 +93,7 @@ export function buildProfile(
           overdistensionVolume: v.overdistensionVolume,
           overdistensionStiffness: v.overdistensionStiffness,
         }),
+        ...v.lung,
       },
       drive: { neuralRate: v.neuralRate, pmusMax: v.pmusMax, inspFraction: INSP_FRACTION },
     },
@@ -136,6 +139,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       dbp: 75,
       overdistensionVolume: 1.1,
       overdistensionStiffness: 20,
+      lung: { viscoResistance: 3, viscoTime: 1, chestWallCompliance: 0.2, pesOffset: 3 },
       referencePh: 7.4,
     },
   ),
@@ -160,7 +164,16 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       sbp: 110,
       dbp: 65,
       overdistensionVolume: 0.7,
-      overdistensionStiffness: 250,
+      overdistensionStiffness: 80,
+      lung: {
+        recruitCompliance: 0.02,
+        recruitClosing: 12,
+        recruitOpening: 38,
+        viscoResistance: 4,
+        viscoTime: 1,
+        chestWallCompliance: 0.15,
+        pesOffset: 5,
+      },
       referencePh: 7.3,
     },
     6,
@@ -187,6 +200,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       dbp: 80,
       airwayCollapse: 4,
       collapseVolume: 1.1,
+      lung: { viscoResistance: 5, viscoTime: 1.2, chestWallCompliance: 0.2, pesOffset: 3 },
       referencePh: 7.3,
     },
   ),
@@ -212,6 +226,13 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       dbp: 80,
       airwayCollapse: 5,
       collapseVolume: 1.5,
+      lung: {
+        criticalPressure: 7,
+        viscoResistance: 6,
+        viscoTime: 1.2,
+        chestWallCompliance: 0.2,
+        pesOffset: 3,
+      },
       referencePh: 7.35,
     },
   ),
@@ -236,6 +257,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       overdistensionVolume: 1.1,
       overdistensionStiffness: 20,
       startSedation: "awake",
+      lung: { viscoResistance: 3, viscoTime: 1, chestWallCompliance: 0.2, pesOffset: 3 },
       referencePh: 7.1,
     },
   ),
@@ -261,6 +283,15 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       dbp: 95,
       overdistensionVolume: 0.9,
       overdistensionStiffness: 60,
+      lung: {
+        recruitCompliance: 0.02,
+        recruitClosing: 8,
+        recruitOpening: 18,
+        viscoResistance: 4,
+        viscoTime: 1,
+        chestWallCompliance: 0.15,
+        pesOffset: 4,
+      },
       referencePh: 7.3,
     },
   ),
@@ -285,6 +316,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       dbp: 60,
       overdistensionVolume: 1.0,
       overdistensionStiffness: 20,
+      lung: { viscoResistance: 3, viscoTime: 1, chestWallCompliance: 0.2, pesOffset: 3 },
       referencePh: 7.35,
     },
   ),
@@ -308,6 +340,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       dbp: 70,
       overdistensionVolume: 1.1,
       overdistensionStiffness: 20,
+      lung: { viscoResistance: 3, viscoTime: 1, chestWallCompliance: 0.2, pesOffset: 3 },
       referencePh: 7.4,
     },
   ),

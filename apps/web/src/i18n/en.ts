@@ -1,6 +1,8 @@
 /** English strings. Other locales copy this shape (R1-Q9: English now, more languages later). */
 export const en = {
   disclaimer: "Education only. Not for clinical use.",
+  copyright: "© 2026 Sirot Jantharaksa, MD",
+  createdBy: "MedVent Simulator, created by Sirot Jantharaksa, MD.",
   connecting: "Starting the simulator…",
   engineError: "The simulator stopped: {message}",
 

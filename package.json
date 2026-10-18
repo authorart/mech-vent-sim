@@ -1,6 +1,7 @@
 {
   "name": "mech-vent-sim",
   "private": true,
+  "author": "Sirot Jantharaksa, MD",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "corepack pnpm --filter web dev",

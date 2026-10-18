@@ -222,6 +222,9 @@ export class Session {
     return {
       fio2: this.sim.currentSettings.fio2,
       endExpAlveolarPressure: this.latestRecord?.endExpRecoil ?? this.sim.currentSettings.peep,
+      ...(this.sim.lung.hasRecruitment && {
+        endExpRecruited: this.latestRecord?.endExpRecruited ?? this.sim.recruited,
+      }),
     };
   }
 }

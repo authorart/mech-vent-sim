@@ -5,3 +5,7 @@
 ## Amendment (V1.2, 2026-10-18): volume-dependent expiratory resistance
 
 A constant R_exp empties the lung along a straight flow–volume line, so the obstructive profiles lacked the early peak and "scooped" expiratory limb that teachers point to. Obstructive profiles now set `airwayCollapse` and `collapseVolume`: R_exp is the resistance at that volume and rises as the lung empties (R_exp × (V_c/V)^n, never below R_insp and at most 2× R_exp). The model stays one-compartment. Side effect, consistent with Hess & Kacmarek ch. 15/18: in COPD, added PEEP raises lung volume, lowers R_exp and is partly absorbed (Total PEEP rises less than PEEP). Asthma uses a gentler curve so that lowering the rate still halves PEEP_i. A true waterfall (critical closing pressure) model is still deferred to V2 M11.
+
+## Amendment (M11, 2026-10-18): critical pressure for COPD (R6-Q5)
+
+COPD now also has a critical pressure (7 cmH2O): on expiration, when airway pressure would sit below it, the collapsed small airways set the flow (a Starling resistor) and airway pressure no longer matters. External PEEP up to 7 leaves Total PEEP unchanged (14.5 cmH2O at PEEP 0, 5 and 7); above it, PEEP adds. Asthma has none, matching Hess & Kacmarek ch. 18. A side effect is a small static PEEP_i even with very long expiration, which is what airway closure produces.

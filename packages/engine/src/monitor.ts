@@ -30,6 +30,8 @@ export interface BreathMetrics {
   cstat: number | null;
   /** Airway resistance from this breath's plateau (cmH2O/(L/s)); needs constant flow at end of inspiration. */
   raw: number | null;
+  /** Stress index of this breath (passive constant-flow VCV only), see BreathRecord. */
+  stressIndex: number | null;
   vti: number;
   vte: number;
   /** Minute ventilation: exhaled volume over the last minute (L/min). */
@@ -102,6 +104,7 @@ export class Monitor {
       drivingPressure: this.pplat ? this.pplat.value - baseline : null,
       cstat,
       raw,
+      stressIndex: b.stressIndex,
       vti: b.vti,
       vte: b.vte,
       ve: this.recent.reduce((s, r) => s + r.vte, 0) * perMinute,

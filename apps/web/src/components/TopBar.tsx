@@ -108,6 +108,7 @@ export function TopBar({ onInstructor }: { onInstructor: () => void }) {
         <span className="rounded border border-edge px-2 py-1 text-xs text-ink-2 lg:order-5">
           {m.disclaimer}
         </span>
+        <span className="text-xs text-ink-3 lg:order-6">{m.copyright}</span>
       </div>
     </header>
   );

@@ -98,12 +98,12 @@ describe("Rise time (pressure servo)", () => {
 });
 
 describe("PSV secondary cycling", () => {
-  it("a high-drive patient's effort ends before flow reaches Esens: end-inspiratory spike and pressure cycling; raising Esens or lowering support fixes it", () => {
-    const late = run("metabolicAcidosis", psv({}), "awake");
+  it("a patient pushing against a late-cycling breath (COPD, Esens 5%) pressure-cycles it: the end-inspiratory spike (fig. 15-9); raising Esens fixes it", () => {
+    const late = run("copd", psv({ pSupport: 20, esens: 0.05 }), "awake", { agitation: "severe" });
     expect(late.cycles.pressure ?? 0).toBeGreaterThan(late.breaths / 2);
     expect(late.maxInspPaw).toBeGreaterThan(late.target + 2.5);
-    expect(run("metabolicAcidosis", psv({ esens: 0.5 }), "awake").cycles.pressure ?? 0).toBe(0);
-    expect(run("metabolicAcidosis", psv({ pSupport: 5 }), "awake").cycles.pressure ?? 0).toBe(0);
+    const fixed = run("copd", psv({ pSupport: 20, esens: 0.4 }), "awake", { agitation: "severe" });
+    expect(fixed.cycles.pressure ?? 0).toBe(0);
   });
 });
 

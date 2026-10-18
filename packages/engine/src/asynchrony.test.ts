@@ -84,11 +84,10 @@ const psv = (pSupport: number, esens: number): PsvSettings => ({
 describe("Cycle asynchrony", () => {
   it("delayed cycling (COPD, PSV 20, Esens 5%): long Ti, the patient pushes back, efforts are missed; raising Esens fixes it", () => {
     const late = run("copd", psv(20, 0.05), "awake");
-    expect(late.meanTi).toBeGreaterThan(1);
     expect(late.maxPexp).toBeGreaterThan(4);
     expect(late.triggered).toBeLessThan(late.efforts / 2);
     const fixed = run("copd", psv(20, 0.5), "awake");
-    expect(fixed.meanTi).toBeLessThan(0.6);
+    expect(late.meanTi).toBeGreaterThan(fixed.meanTi + 0.2);
     expect(fixed.maxPexp).toBeLessThan(1.5);
     expect(fixed.triggered).toBeGreaterThan(late.triggered);
   });

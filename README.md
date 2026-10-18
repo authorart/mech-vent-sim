@@ -4,6 +4,8 @@ A web-based mechanical ventilation **teaching** simulator. Learners adjust venti
 
 **Live:** https://mech-vent-sim.vercel.app
 
+Created by **Sirot Jantharaksa, MD**. © 2026 Sirot Jantharaksa, MD.
+
 > ⚠️ **Education only. Not for clinical use.** This software is not a medical device and must not inform patient care.
 
 ## Repository layout

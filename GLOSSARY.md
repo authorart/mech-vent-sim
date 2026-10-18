@@ -79,8 +79,32 @@ _Avoid_: R_aw (when the direction matters)
 Resistance to gas flowing out. It is higher than R_insp in obstructive disease because the airways collapse during expiration. It sets how fast the lungs empty and so PEEP_i.
 
 **Recruitment**:
-Collapsed or flooded alveoli reopening as PEEP rises, which lowers shunt.
+Collapsed or flooded alveoli reopening, which lowers shunt and raises compliance. Units reopen only above a higher opening pressure than the one at which they close, so lung opened by a Recruitment Maneuver can be kept open by a lower PEEP (hysteresis).
 _Avoid_: lung opening
+
+**Recruitment Maneuver**:
+A brief, deliberately high airway pressure (for example 40–45 cmH2O) to reopen collapsed lung, usually followed by a decremental PEEP trial.
+_Avoid_: RM breath, sigh (that's a patient's deep breath)
+
+**Tidal Recruitment**:
+Lung units opening during each inspiration and closing again during expiration, because PEEP is below their closing pressure.
+_Avoid_: cyclic opening (fine in prose, not as the term)
+
+**Stress Index**:
+The shape of the airway pressure rise during a passive, constant-flow volume-control breath: 1 is straight; below 1 bends down (tidal recruitment); above 1 bends up (overdistension).
+_Avoid_: SI curve, compliance curve
+
+**Expiratory Flow Limitation**:
+Small airways collapsing during expiration below a critical pressure, so expiratory flow stops depending on airway pressure. PEEP up to that pressure offsets PEEP_i without raising Total PEEP.
+_Avoid_: waterfall (that's the analogy), air trapping (that's the result)
+
+**Esophageal Pressure (Pes)**:
+Pressure in the lower esophagus, used as the stand-in for pleural pressure. Alveolar pressure minus Pes is the Transpulmonary Pressure that actually stretches the lung.
+_Avoid_: pleural pressure (in the UI), Pes balloon pressure
+
+**Transpulmonary Pressure**:
+Alveolar pressure minus pleural (esophageal) pressure: the stress on the lung itself, separate from the chest wall.
+_Avoid_: driving pressure (that's P_plat − Total PEEP), P_L (fine as the symbol)
 
 **Time Constant (tau)**:
 The product of resistance and compliance. It sets how fast the lungs fill and empty.

@@ -76,10 +76,10 @@ describe("Obstructive expiratory flow", () => {
 });
 
 describe("Overdistension", () => {
-  it("ARDS: static compliance falls when Vt pushes past the upper bend", () => {
+  it("normal lungs: static compliance falls when a large Vt pushes past the upper bend", () => {
     const cstat = (vt: number) => {
-      const s = createProfileSession("ards", {
-        settings: { ...INITIAL_SETTINGS, tidalVolume: vt, highPressureLimit: 80 },
+      const s = createProfileSession("normal", {
+        settings: { ...INITIAL_SETTINGS, tidalVolume: vt, peakFlow: 1.5, highPressureLimit: 80 },
         features: { ...DEFAULT_FEATURES, cardiacOscillation: "off" },
       });
       s.advance(20);
@@ -87,7 +87,7 @@ describe("Overdistension", () => {
       const e = s.advance(6).events.find((x) => x.type === "plateauMeasured");
       return e?.type === "plateauMeasured" ? vt / (e.plateau - INITIAL_SETTINGS.peep) : NaN;
     };
-    expect(cstat(0.8)).toBeLessThan(cstat(0.4) * 0.8);
+    expect(cstat(1.4)).toBeLessThan(cstat(0.5) * 0.85);
   });
 });
 

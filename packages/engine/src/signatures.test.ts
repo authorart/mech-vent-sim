@@ -67,9 +67,11 @@ describe("Normal lungs", () => {
 
 describe("Severe ARDS", () => {
   const x = measure("ards");
-  it("VCV: P_plat ≥ 30 with a narrow peak–plateau gap", () => {
-    expect(x.pplat!).toBeGreaterThanOrEqual(29.5);
-    expect(x.ppeak - x.pplat!).toBeLessThan(10);
+  it("VCV: P_plat about 30 with a narrow peak–plateau gap", () => {
+    // M11: tidal recruitment during the breath brings it slightly under 30 on Vt 500.
+    expect(x.pplat!).toBeGreaterThanOrEqual(28.5);
+    // Includes the tissue (viscoelastic) part of the resistive pressure, as in real patients.
+    expect(x.ppeak - x.pplat!).toBeLessThan(12);
   });
   it("refractory hypoxemia: P/F < 100 on FiO2 1.0", () => {
     expect(x.pf).toBeLessThan(100);

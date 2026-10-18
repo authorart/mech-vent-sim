@@ -24,6 +24,23 @@ export interface Mechanics {
   overdistensionVolume?: number;
   /** Extra recoil k × (V − overdistensionVolume)² above that volume (cmH2O/L²). 0 or unset = linear. */
   overdistensionStiffness?: number;
+  /**
+   * Expiratory flow limitation (M11, COPD): below this pressure the small airways collapse and
+   * expiratory flow stops depending on airway pressure (waterfall). PEEP up to it is absorbed.
+   */
+  criticalPressure?: number;
+  /** Recruitment (M11): compliance added when the whole recruitable lung is open (L/cmH2O). */
+  recruitCompliance?: number;
+  /** Mean closing pressure (cmH2O) of recruitable units: the deflation limb. */
+  recruitClosing?: number;
+  /** Mean opening pressure (cmH2O): the inflation limb (above closing = hysteresis). */
+  recruitOpening?: number;
+  /** Viscoelastic tissue (M11): resistance (cmH2O/(L/s)) and time constant (s) of the P1 → P2 decay. */
+  viscoResistance?: number;
+  viscoTime?: number;
+  /** Chest wall compliance (L/cmH2O) and end-expiratory esophageal pressure (cmH2O), for Pes. */
+  chestWallCompliance?: number;
+  pesOffset?: number;
 }
 
 /** Respiratory drive: produces Muscle Pressure on its own neural clock. */
@@ -144,6 +161,13 @@ export interface BreathRecord {
   highPressureCycled: boolean;
   /** What ended inspiration: set time (VCV/PCV/backup), PSV flow (Esens), PSV pressure, or the high pressure limit. */
   cycle: CycleReason;
+  /**
+   * Stress index of a passive constant-flow VCV breath: the exponent b of Paw = a·t^b + c.
+   * 1 = linear; < 1 tidal recruitment; > 1 overdistension. Null when not measurable.
+   */
+  stressIndex: number | null;
+  /** Fraction of the recruitable lung open at the end of this breath's expiration (engine truth). */
+  endExpRecruited: number;
 }
 
 export type EngineEvent =
@@ -174,5 +198,7 @@ export const SAMPLE = {
   PMUS: 5,
   /** Expiratory Muscle Pressure (cmH2O, ≥ 0): the patient pushing gas out (ADR-0002 amendment). */
   PEXP: 6,
-  STRIDE: 7,
+  /** Esophageal (pleural) pressure (cmH2O, M11). */
+  PES: 7,
+  STRIDE: 8,
 } as const;

@@ -79,6 +79,11 @@ export interface GasInputs {
   fio2: number;
   /** End-expiratory alveolar pressure (cmH2O): drives recruitment. */
   endExpAlveolarPressure: number;
+  /**
+   * Fraction of the recruitable lung open at end expiration, when the lung model tracks
+   * recruitment (M11). Without it, recruitment follows end-expiratory pressure.
+   */
+  endExpRecruited?: number;
 }
 
 /** Steady-state targets and the dynamic arterial state. */
@@ -134,7 +139,9 @@ export class GasExchange {
 
   shuntFraction(inputs: GasInputs): number {
     const p = this.params;
-    const s = 1 / (1 + Math.exp(-(inputs.endExpAlveolarPressure - p.peepHalf) / RECRUIT_WIDTH));
+    const s =
+      inputs.endExpRecruited ??
+      1 / (1 + Math.exp(-(inputs.endExpAlveolarPressure - p.peepHalf) / RECRUIT_WIDTH));
     const trueShunt = p.shuntMax * (1 - p.recruitableFraction * s);
     const admixture = p.vqMismatch * Math.max(0, (1 - inputs.fio2) / (1 - 0.21));
     return Math.min(0.95, trueShunt + admixture);

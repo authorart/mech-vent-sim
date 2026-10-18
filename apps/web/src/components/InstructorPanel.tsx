@@ -433,6 +433,9 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
           />
         </div>
       </Section>
+      <p className="border-t border-edge pt-4 text-xs text-ink-3">
+        {m.createdBy} {m.copyright}.
+      </p>
     </aside>
   );
 }

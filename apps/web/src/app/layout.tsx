@@ -16,7 +16,10 @@ const barlowCondensed = Barlow_Condensed({
 
 export const metadata: Metadata = {
   title: "MedVent Simulator",
-  description: "Mechanical ventilation teaching simulator. Education only, not for clinical use.",
+  description:
+    "Mechanical ventilation teaching simulator by Sirot Jantharaksa, MD. Education only, not for clinical use.",
+  authors: [{ name: "Sirot Jantharaksa, MD" }],
+  creator: "Sirot Jantharaksa, MD",
 };
 
 export const viewport: Viewport = {
