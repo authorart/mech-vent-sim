@@ -9,6 +9,7 @@ import {
 } from "./drive";
 import { NATURAL_VARIABILITY, type EffortVariability } from "./effort";
 import { AlarmEngine, type AlarmEvent, type AlarmLimits } from "./alarms";
+import { AsynchronyTracker } from "./asynchrony";
 import { GasExchange, type BloodGas, type GasInputs, type GasParams } from "./gas";
 import { Monitor, type BreathMetrics } from "./monitor";
 import { Simulator, type SimulatorOptions } from "./simulator";
@@ -64,6 +65,7 @@ export const PHYSIOLOGY_PRIME_TIME = 10;
 export class Session {
   readonly sim: Simulator;
   readonly monitor = new Monitor();
+  readonly asynchrony = new AsynchronyTracker();
   readonly alarms: AlarmEngine;
   readonly gas: GasExchange;
   readonly circulation: Circulation;
@@ -158,7 +160,9 @@ export class Session {
 
     for (const it of items) {
       if (it.breath) {
+        this.asynchrony.onBreath(it.breath);
         const m = this.monitor.update(it.breath);
+        m.asynchrony = this.asynchrony.summary(it.breath.endTime);
         metrics.push(m);
         this.latest = m;
         this.latestRecord = it.breath;
@@ -172,6 +176,7 @@ export class Session {
           ),
         );
       } else if (it.event) {
+        if (it.event.type === "asynchrony") this.asynchrony.onEvent(it.event.t, it.event.kind);
         alarms.push(...this.alarms.onEvent(it.event));
       }
     }

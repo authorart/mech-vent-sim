@@ -210,7 +210,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
     "High compliance, expiratory flow limitation, chronic compensated hypercapnia (HCO3⁻ 32).",
     {
       compliance: 80,
-      rInsp: 20,
+      rInsp: 18,
       rExp: 45,
       vco2: 200,
       vdvt: 0.5,
@@ -227,8 +227,8 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       airwayCollapse: 5,
       collapseVolume: 1.5,
       lung: {
-        criticalPressure: 7,
-        viscoResistance: 6,
+        criticalPressure: 6,
+        viscoResistance: 3,
         viscoTime: 1.2,
         chestWallCompliance: 0.2,
         pesOffset: 3,

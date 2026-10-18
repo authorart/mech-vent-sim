@@ -168,6 +168,8 @@ export interface BreathRecord {
   stressIndex: number | null;
   /** Fraction of the recruitable lung open at the end of this breath's expiration (engine truth). */
   endExpRecruited: number;
+  /** Asynchronies that belong to this breath (ineffective triggers arrive as events instead). */
+  asynchronies: AsynchronyKind[];
 }
 
 export type EngineEvent =
@@ -176,6 +178,7 @@ export type EngineEvent =
   | { type: "apneaBackupStarted"; t: number }
   | { type: "apneaBackupEnded"; t: number }
   | { type: "highPressureCycle"; t: number; paw: number }
+  | { type: "asynchrony"; t: number; kind: AsynchronyKind }
   | { type: "plateauMeasured"; t: number; plateau: number; reliable: boolean }
   | {
       type: "totalPeepMeasured";
@@ -187,6 +190,29 @@ export type EngineEvent =
 
 /** Interleaved Sample layout in the output Float32Array. */
 export type CycleReason = "time" | "flow" | "pressure" | "highPressure";
+
+/**
+ * Patient–ventilator asynchrony, classified from the Engine's ground truth (M12; Hess & Kacmarek
+ * ch. 15). Learners see only the waveforms unless the instructor turns labels on (R6-Q10).
+ */
+export type AsynchronyKind =
+  | "ineffectiveTrigger"
+  | "autoTrigger"
+  | "reverseTrigger"
+  | "doubleTrigger"
+  | "flowStarvation"
+  | "prematureCycling"
+  | "delayedCycling";
+
+export const ASYNCHRONY_KINDS: AsynchronyKind[] = [
+  "ineffectiveTrigger",
+  "autoTrigger",
+  "reverseTrigger",
+  "doubleTrigger",
+  "flowStarvation",
+  "prematureCycling",
+  "delayedCycling",
+];
 
 export const SAMPLE = {
   T: 0,

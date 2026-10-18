@@ -21,6 +21,12 @@ export {
 } from "./simulator";
 export { Monitor, type BreathMetrics, type Measured } from "./monitor";
 export {
+  AsynchronyTracker,
+  ASYNCHRONY_WINDOW,
+  ASYNCHRONY_INDEX_HIGH,
+  type AsynchronySummary,
+} from "./asynchrony";
+export {
   AlarmEngine,
   ALARM_PRIORITY,
   DEFAULT_ALARM_LIMITS,

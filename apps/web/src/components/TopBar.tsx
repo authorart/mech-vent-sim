@@ -35,7 +35,13 @@ function AlarmChip({ a, text }: { a: AlarmState; text: string }) {
   );
 }
 
-export function TopBar({ onInstructor }: { onInstructor: () => void }) {
+export function TopBar({
+  onInstructor,
+  onGuide,
+}: {
+  onInstructor: () => void;
+  onGuide: () => void;
+}) {
   const alarms = useStore((s) => s.alarms);
   const silencedUntil = useStore((s) => s.silencedUntil);
   const engine = useStore((s) => s.engine);
@@ -70,13 +76,24 @@ export function TopBar({ onInstructor }: { onInstructor: () => void }) {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onInstructor}
-        className="rounded bg-panel px-3 py-2 text-sm text-ink hover:bg-edge lg:order-4 lg:py-1.5"
-      >
-        {m.instructor}
-      </button>
+      <div className="flex gap-2 lg:order-4">
+        <button
+          type="button"
+          onClick={onGuide}
+          aria-label={m.guide}
+          className="rounded border border-edge px-3 py-2 text-sm text-ink hover:bg-panel lg:py-1.5"
+        >
+          <span className="sm:hidden">{m.guideShort}</span>
+          <span className="hidden sm:inline">{m.guide}</span>
+        </button>
+        <button
+          type="button"
+          onClick={onInstructor}
+          className="rounded bg-panel px-3 py-2 text-sm text-ink hover:bg-edge lg:py-1.5"
+        >
+          {m.instructor}
+        </button>
+      </div>
 
       <ul
         aria-live="assertive"

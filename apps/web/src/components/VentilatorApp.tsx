@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useEngine } from "@/engine/useEngine";
 import { useStore } from "@/engine/store";
 import { fmt, messages as m } from "@/i18n";
+import { AsynchronyGuide } from "./AsynchronyGuide";
 import { InstructorPanel } from "./InstructorPanel";
 import { ResumePrompt } from "./ResumePrompt";
 import { Loops } from "./Loops";
@@ -21,10 +22,11 @@ export function VentilatorApp() {
   const [view, setView] = useState<"waveforms" | "loops">("waveforms");
   const [frozen, setFrozen] = useState(false);
   const [instructor, setInstructor] = useState(false);
+  const [guide, setGuide] = useState(false);
 
   return (
     <div className="flex min-h-screen flex-col lg:h-screen lg:min-h-0">
-      <TopBar onInstructor={() => setInstructor((v) => !v)} />
+      <TopBar onInstructor={() => setInstructor((v) => !v)} onGuide={() => setGuide(true)} />
 
       {connection === "error" && (
         <p role="alert" className="bg-alarm-high px-4 py-2 text-sm text-white">
@@ -104,6 +106,13 @@ export function VentilatorApp() {
       <SettingsStrip />
 
       <InstructorPanel open={instructor} onClose={() => setInstructor(false)} />
+      <AsynchronyGuide
+        open={guide}
+        onClose={() => {
+          setGuide(false);
+          setView("waveforms");
+        }}
+      />
     </div>
   );
 }

@@ -10,7 +10,7 @@ import type { ProfileId } from "./profiles";
 import type { Drive, EngineEvent, Mechanics, VentSettings } from "./types";
 import type { CirculationParams, Vitals } from "./vitals";
 
-export const ENGINE_CONTRACT_VERSION = 4;
+export const ENGINE_CONTRACT_VERSION = 5;
 
 /** Instructor Panel changes; each field is merged into the running patient. */
 export interface ProfilePatch {

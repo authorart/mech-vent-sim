@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { num } from "@/engine/format";
 import { SWEEP_SECONDS } from "@/engine/ring";
-import { sweep } from "@/engine/store";
+import { asynchronyMarks, sweep, useStore } from "@/engine/store";
+import { GUIDE_BY_KIND } from "@/guide/asynchrony";
 import { messages as m } from "@/i18n";
 
 type Channel = "paw" | "flow" | "volume";
@@ -105,6 +106,7 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
       ink2: color("--ink-2"),
       ink3: color("--ink-3"),
       cursor: color("--ink"),
+      panel: color("--panel"),
     };
     const family = color("--font-barlow") || "system-ui, sans-serif";
 
@@ -128,14 +130,17 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
 
     let lastVersion = -1;
     let lastCursor: { x: number; y: number } | null = null;
+    let lastLabels = false;
     let raf = 0;
 
     const draw = () => {
       raf = requestAnimationFrame(draw);
       const cur = cursorRef.current;
-      if (sweep.version === lastVersion && cur === lastCursor) return;
+      const labels = useStore.getState().showLabels;
+      if (sweep.version === lastVersion && cur === lastCursor && labels === lastLabels) return;
       lastVersion = sweep.version;
       lastCursor = cur;
+      lastLabels = labels;
 
       ctx.clearRect(0, 0, w, h);
       const rowH = (h - ROW_GAP * (ROWS.length - 1)) / ROWS.length;
@@ -193,6 +198,41 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
         }
         ctx.stroke();
       });
+
+      // Asynchrony labels (instructor's choice): a tick on the flow trace and a short name.
+      if (labels) {
+        const flowTop = rowH + ROW_GAP;
+        ctx.font = `11px ${family}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        let lastX = -Infinity;
+        for (const mark of asynchronyMarks) {
+          const i = Math.round(mark.t * 100) % n;
+          const ts = sweep.t[i];
+          // Only while that stretch of trace is still on screen.
+          if (ts === undefined || !Number.isFinite(ts) || Math.abs(ts - mark.t) > 0.02) continue;
+          const x = xAt(i);
+          ctx.strokeStyle = colors.ink2;
+          ctx.globalAlpha = 0.7;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(Math.round(x) + 0.5, flowTop + 18);
+          ctx.lineTo(Math.round(x) + 0.5, flowTop + rowH);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.globalAlpha = 1;
+          const text = GUIDE_BY_KIND[mark.kind].label;
+          const tw = ctx.measureText(text).width + 8;
+          const y = flowTop + 18 + (x - lastX < tw ? 15 : 0);
+          ctx.fillStyle = colors.panel;
+          ctx.fillRect(x - tw / 2, y, tw, 15);
+          ctx.fillStyle = colors.cursor;
+          ctx.fillText(text, x, y + 2);
+          lastX = x;
+        }
+        ctx.font = `12px ${family}`;
+        ctx.textBaseline = "middle";
+      }
 
       if (cur && cur.x >= AXIS_W) {
         const i = Math.min(n - 1, Math.max(0, Math.round(((cur.x - AXIS_W) / plotW) * (n - 1))));

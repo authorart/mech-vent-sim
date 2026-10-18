@@ -36,6 +36,10 @@ export const ENTRAINED_EFFORT = {
 };
 
 interface Cycle {
+  /** Unique per effort, so breaths can be matched to the effort that caused them. */
+  id: number;
+  /** Set off by a ventilator breath (reverse triggering) rather than the patient's own clock. */
+  entrained: boolean;
   start: number;
   period: number;
   ti: number;
@@ -66,8 +70,18 @@ function inspiratoryEnd(c: Cycle): number {
  * so mismatches between the two produce asynchrony on their own. Each cycle's length, depth and
  * inspiratory time are drawn when it starts; with no variability every cycle is identical.
  */
+/** The effort under way at some moment (see PatientEffort.activeEffort). */
+export interface ActiveEffort {
+  id: number;
+  entrained: boolean;
+  start: number;
+  /** When active inspiration ends (Ti plus half the relaxation). */
+  inspirationEnd: number;
+}
+
 export class PatientEffort {
   private cycle: Cycle | null = null;
+  private nextId = 1;
   private nextStart: number;
   private entrained: Cycle[] = [];
   private random: (() => number) | null = null;
@@ -104,6 +118,15 @@ export class PatientEffort {
     return !!own || this.entrained.some((c) => t >= c.start && t < inspiratoryEnd(c));
   }
 
+  /** The effort breathing in at time t (the latest one if two overlap), or null. */
+  activeEffort(t: number): ActiveEffort | null {
+    const all = [...(this.cycle ? [this.cycle] : []), ...this.entrained];
+    const active = all.filter((c) => t >= c.start && t < inspiratoryEnd(c));
+    if (active.length === 0) return null;
+    const c = active.reduce((a, b) => (b.start > a.start ? b : a));
+    return { id: c.id, entrained: c.entrained, start: c.start, inspirationEnd: inspiratoryEnd(c) };
+  }
+
   /** When the effort under way at time t stops breathing in, or null if none is. */
   inspirationEndsAt(t: number): number | null {
     const all = [...(this.cycle ? [this.cycle] : []), ...this.entrained];
@@ -114,7 +137,15 @@ export class PatientEffort {
   /** Schedule an effort entrained by a ventilator inflation starting at t (reverse triggering). */
   entrain(t: number): void {
     const { delay, ti, pmus } = ENTRAINED_EFFORT;
-    this.entrained.push({ start: t + delay, period: ti * 2, ti, amplitude: pmus, sigh: false });
+    this.entrained.push({
+      id: this.nextId++,
+      entrained: true,
+      start: t + delay,
+      period: ti * 2,
+      ti,
+      amplitude: pmus,
+      sigh: false,
+    });
   }
 
   /** The cycle just started was a sigh (for tests and teaching notes). */
@@ -145,7 +176,10 @@ export class PatientEffort {
   private newCycle(start: number, period: number, inspFraction: number): Cycle {
     const v = this.variability;
     const rnd = this.random;
-    if (!v || !rnd) return { start, period, ti: inspFraction * period, amplitude: 1, sigh: false };
+    const id = this.nextId++;
+    if (!v || !rnd) {
+      return { id, entrained: false, start, period, ti: inspFraction * period, amplitude: 1, sigh: false };
+    }
     const normal = normalFrom(rnd);
     let p = period * clamp(1 + v.cvRate * normal(), 0.6, 1.6);
     let fraction = clamp(inspFraction * (1 + v.cvTi * normal()), 0.2, 0.55);
@@ -156,6 +190,6 @@ export class PatientEffort {
       fraction = Math.min(0.55, (fraction * SIGH.ti) / SIGH.period);
       p *= SIGH.period;
     }
-    return { start, period: p, ti: fraction * p, amplitude, sigh };
+    return { id, entrained: false, start, period: p, ti: fraction * p, amplitude, sigh };
   }
 }

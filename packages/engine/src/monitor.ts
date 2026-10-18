@@ -1,4 +1,5 @@
-import type { BreathRecord, BreathTrigger, Mode } from "./types";
+import type { AsynchronySummary } from "./asynchrony";
+import type { AsynchronyKind, BreathRecord, BreathTrigger, Mode } from "./types";
 
 /** A value measured by a maneuver, and when it was measured. */
 export interface Measured {
@@ -32,6 +33,10 @@ export interface BreathMetrics {
   raw: number | null;
   /** Stress index of this breath (passive constant-flow VCV only), see BreathRecord. */
   stressIndex: number | null;
+  /** Asynchronies of this breath (M12, engine truth). */
+  asynchronies: AsynchronyKind[];
+  /** Rolling two-minute asynchrony summary, filled in by the Session (null from a bare Monitor). */
+  asynchrony: AsynchronySummary | null;
   vti: number;
   vte: number;
   /** Minute ventilation: exhaled volume over the last minute (L/min). */
@@ -105,6 +110,8 @@ export class Monitor {
       cstat,
       raw,
       stressIndex: b.stressIndex,
+      asynchronies: b.asynchronies,
+      asynchrony: null,
       vti: b.vti,
       vte: b.vte,
       ve: this.recent.reduce((s, r) => s + r.vte, 0) * perMinute,

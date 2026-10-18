@@ -3,6 +3,7 @@ import { mulberry32, normalFrom } from "./random";
 import { LinearLung } from "./lung";
 import type {
   BreathRecord,
+  AsynchronyKind,
   BreathTrigger,
   CycleReason,
   EngineEvent,
@@ -79,6 +80,20 @@ export const PSV_PRESSURE_CYCLE = 3;
 /** Pressure cycling is ignored this long after the rise, so a start-up overshoot can't end the breath (s). */
 export const PSV_PRESSURE_CYCLE_GUARD = 0.15;
 
+/**
+ * Asynchrony detection (M12). An effort counts if its Muscle Pressure peaks above
+ * ASYNC_MIN_EFFORT; cycling is premature/delayed when the mismatch with neural inspiration
+ * exceeds these margins (s); flow starvation when the patient pulls harder than
+ * ASYNC_STARVATION_PMUS during a volume breath, or airway pressure falls below PEEP in a
+ * pressure breath.
+ */
+export const ASYNC_MIN_EFFORT = 1;
+export const ASYNC_PREMATURE_MARGIN = 0.12;
+export const ASYNC_DELAYED_MARGIN = 0.2;
+export const ASYNC_STARVATION_PMUS = 3;
+/** Premature cycling counts only if the patient is still pulling at least this hard (cmH2O), so it shows. */
+export const ASYNC_PREMATURE_PMUS = 2.5;
+
 /** Displayed-signal noise (1 SD): pressure cmH2O, flow L/s. Physics and metrics stay noise-free. */
 export const SIGNAL_NOISE = { paw: 0.04, flow: 0.004 };
 
@@ -128,6 +143,10 @@ interface BreathAccumulator {
   cycleFlow: number;
   highPressureCycled: boolean;
   cycle: CycleReason;
+  asynchronies: AsynchronyKind[];
+  /** Largest Muscle Pressure during inspiration, and lowest airway pressure after 0.1 s. */
+  maxPullPmus: number;
+  minInspPaw: number;
   siT: number[];
   siP: number[];
   maxInspPmus: number;
@@ -178,6 +197,21 @@ export class Simulator {
   private pexp = 0;
   /** When the effort that belongs to the current breath stops breathing in (null = none). */
   private breathNeuralEnd: number | null = null;
+  /** Effort that the current and the previous breath answered (for double triggers). */
+  private breathEffortId: number | null = null;
+  private lastBreathEffortId: number | null = null;
+  /** The effort being watched for an ineffective trigger. */
+  private watched: {
+    id: number;
+    entrained: boolean;
+    peak: number;
+    /** When it peaked: ineffective efforts are labeled there, where the flow notch shows. */
+    peakT: number;
+    /** A breath answered it, or it arrived while the ventilator was already inflating. */
+    answered: boolean;
+    /** It triggered a breath (and was labeled then). */
+    triggered: boolean;
+  } | null = null;
 
   /** Servo flow (L/s) and its rate of change, during PCV/PSV inspiration. */
   private ventFlow = 0;
@@ -341,6 +375,7 @@ export class Simulator {
     this.collectStressIndex(t, paw, pmus);
     this.updateExpiratoryMuscles(t);
     this.updateCardiac();
+    this.watchEffort(t, pmus, paw);
 
     this.transition(t, flow, paw);
   }
@@ -461,6 +496,82 @@ export class Simulator {
     const pcrit = this.lung.criticalPressure;
     if (peep + rc * q >= pcrit) return -q;
     return -Math.max(0, palv - pcrit) / r;
+  }
+
+  private asynchrony(t: number, kind: AsynchronyKind): void {
+    this.outEvents.push({ type: "asynchrony", t, kind });
+    if (this.acc && kind !== "ineffectiveTrigger") this.acc.asynchronies.push(kind);
+  }
+
+  /**
+   * Follow each effort from start to end. One that peaks above ASYNC_MIN_EFFORT while the
+   * ventilator is in expiration and is never answered by a breath is an ineffective trigger; an
+   * entrained one is a reverse trigger. Also tracks the patient's pull during inspiration.
+   */
+  private watchEffort(t: number, pmus: number, paw: number): void {
+    if (this.acc && this.phase === "inspiration") {
+      this.acc.maxPullPmus = Math.max(this.acc.maxPullPmus, pmus);
+      if (t - this.phaseStart > 0.1) this.acc.minInspPaw = Math.min(this.acc.minInspPaw, paw);
+    }
+    const e = this.effort.activeEffort(t);
+    const w = this.watched;
+    if (w && (!e || e.id !== w.id)) {
+      if (w.peak >= ASYNC_MIN_EFFORT && !w.triggered) {
+        // An entrained effort is a reverse trigger whenever it happens; an own effort that no
+        // breath answered is an ineffective trigger.
+        if (w.entrained) this.asynchrony(w.peakT, "reverseTrigger");
+        else if (!w.answered) this.asynchrony(w.peakT, "ineffectiveTrigger");
+      }
+      this.watched = null;
+    }
+    if (e && !this.watched) {
+      const inflating = this.phase === "inspiration" || this.phase === "pause";
+      this.watched = {
+        id: e.id,
+        entrained: e.entrained,
+        peak: 0,
+        peakT: t,
+        answered: inflating,
+        triggered: false,
+      };
+      // A breath triggered by this effort is pending (trigger delay): count it as answered.
+      if (this.triggerAt !== null) this.watched.answered = true;
+    }
+    if (this.watched) {
+      if (pmus > this.watched.peak) {
+        this.watched.peak = pmus;
+        this.watched.peakT = t;
+      }
+      if (this.triggerAt !== null) this.watched.answered = true;
+    }
+  }
+
+  /**
+   * At the end of inspiration: did the ventilator stop before the patient (premature cycling)
+   * or keep inflating after them (delayed cycling)? Was the patient starved of flow?
+   */
+  private classifyCycling(t: number): void {
+    const a = this.acc;
+    const b = this.breath;
+    if (!a || !b) return;
+    // A reverse-triggered breath is already labeled; don't pile cycling labels on it.
+    if (a.asynchronies.includes("reverseTrigger")) return;
+    const active = this.effort.activeEffort(t);
+    if (
+      active &&
+      active.id === this.breathEffortId &&
+      active.inspirationEnd - t > ASYNC_PREMATURE_MARGIN &&
+      this.effort.pmus(t) >= ASYNC_PREMATURE_PMUS
+    ) {
+      this.asynchrony(t, "prematureCycling");
+    } else if (this.breathNeuralEnd !== null && t - this.breathNeuralEnd > ASYNC_DELAYED_MARGIN) {
+      this.asynchrony(t, "delayedCycling");
+    }
+    const starved =
+      b.kind === "VCV"
+        ? a.maxPullPmus >= ASYNC_STARVATION_PMUS
+        : a.minInspPaw < this.settings.peep - 1;
+    if (starved && a.trigger !== "mandatory") this.asynchrony(t, "flowStarvation");
   }
 
   /** Paw samples of a constant-flow VCV inspiration, for the stress index. */
@@ -661,6 +772,7 @@ export class Simulator {
 
   private beginExpiration(t: number): void {
     if (this.acc) this.acc.inspEnd = t;
+    this.classifyCycling(t);
     this.phase = "expiration";
     this.phaseStart = t;
   }
@@ -683,6 +795,11 @@ export class Simulator {
     this.breath = this.resolveBreath(this.settings);
     // The effort this breath answers (a patient trigger, or an effort already under way).
     this.breathNeuralEnd = this.effort.inspirationEndsAt(t);
+    const effort = this.effort.activeEffort(t);
+    this.lastBreathEffortId = this.breathEffortId;
+    this.breathEffortId = effort?.id ?? null;
+    if (this.watched && effort && this.watched.id === effort.id) this.watched.answered = true;
+
     if (this.reverseTriggering && trigger !== "patient" && this.effort.drive.pmusMax <= 0) {
       this.effort.entrain(t);
     }
@@ -712,11 +829,21 @@ export class Simulator {
       cycleFlow: 0,
       highPressureCycled: false,
       cycle: "time",
+      asynchronies: [],
+      maxPullPmus: 0,
+      minInspPaw: Infinity,
       siT: [],
       siP: [],
       maxInspPmus: 0,
     };
     this.outEvents.push({ type: "breathStart", t, trigger });
+    if (trigger === "patient") {
+      const effort = this.effort.activeEffort(t);
+      if (effort && this.watched?.id === effort.id) this.watched.triggered = true;
+      if (!effort) this.asynchrony(t, "autoTrigger");
+      else if (effort.entrained) this.asynchrony(t, "reverseTrigger");
+      else if (effort.id === this.lastBreathEffortId) this.asynchrony(t, "doubleTrigger");
+    }
   }
 
   private resolveBreath(s: VentSettings): ActiveBreath {
@@ -778,6 +905,7 @@ export class Simulator {
           ? stressIndex(a.siT, a.siP)
           : null,
       endExpRecruited: this.lung.recruited,
+      asynchronies: a.asynchronies,
     });
     this.acc = null;
   }

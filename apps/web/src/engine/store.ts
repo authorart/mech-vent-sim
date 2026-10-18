@@ -3,6 +3,7 @@
 import {
   predictedBodyWeight,
   type AlarmState,
+  type AsynchronyKind,
   type BloodGas,
   type BreathMetrics,
   type CaseState,
@@ -38,6 +39,10 @@ interface Store {
   heightCm: number;
   /** The remembered last case, offered on open (null once resumed or dismissed). */
   resumable: CaseState | null;
+  /** Recent asynchrony events, newest first (Instructor Panel log). */
+  asynchronyLog: AsynchronyMark[];
+  /** Draw asynchrony labels on the waveforms (instructor's choice, R6-Q10). */
+  showLabels: boolean;
 
   send: (cmd: EngineCommand) => void;
   setSend: (send: (cmd: EngineCommand) => void) => void;
@@ -45,8 +50,18 @@ interface Store {
   setPatientSize: (sex: Sex, heightCm: number) => void;
 }
 
+export interface AsynchronyMark {
+  t: number;
+  kind: AsynchronyKind;
+}
+
 /** Waveform data lives outside React state; canvases read it directly every frame. */
 export const sweep = new SweepBuffer();
+
+/** Asynchrony events for the waveform labels (outside React state, like `sweep`). */
+export const asynchronyMarks: AsynchronyMark[] = [];
+const MAX_MARKS = 80;
+const LOG_LENGTH = 12;
 
 export const useStore = create<Store>((set, get) => ({
   connection: "connecting",
@@ -63,6 +78,8 @@ export const useStore = create<Store>((set, get) => ({
   sex: "male",
   heightCm: 170,
   resumable: null,
+  asynchronyLog: [],
+  showLabels: false,
 
   send: () => {},
   setSend: (send) => set({ send }),
@@ -80,7 +97,15 @@ export const useStore = create<Store>((set, get) => ({
         const prev = get().engine;
         if (prev && prev.profileId !== msg.state.profileId) {
           sweep.clear();
-          set({ metrics: null, gas: null, vitals: null, alarms: [], measuring: null });
+          asynchronyMarks.length = 0;
+          set({
+            metrics: null,
+            gas: null,
+            vitals: null,
+            alarms: [],
+            measuring: null,
+            asynchronyLog: [],
+          });
         }
         set({ engine: msg.state });
         return;
@@ -105,6 +130,13 @@ export const useStore = create<Store>((set, get) => ({
         const e = msg.event;
         if (e.type === "breathStart") {
           sweep.markBreathStart(e.t);
+          return;
+        }
+        if (e.type === "asynchrony") {
+          const mark = { t: e.t, kind: e.kind };
+          asynchronyMarks.push(mark);
+          if (asynchronyMarks.length > MAX_MARKS) asynchronyMarks.shift();
+          set({ asynchronyLog: [mark, ...get().asynchronyLog].slice(0, LOG_LENGTH) });
           return;
         }
         if (e.type === "plateauMeasured" || e.type === "totalPeepMeasured") {

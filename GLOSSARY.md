@@ -149,6 +149,10 @@ _Avoid_: baseline drive
 Any mismatch between the patient's neural breathing and what the ventilator delivers. Its types are Trigger, Flow, Cycle and Mode Asynchrony.
 _Avoid_: dyssynchrony, fighting the ventilator
 
+**Asynchrony Index**:
+Asynchrony events divided by all respiratory cycles (ventilator breaths plus ineffective efforts) over the last two minutes, as a percentage. Above 10% is usually called frequent asynchrony.
+_Avoid_: asynchrony rate, AI (fine as the abbreviation)
+
 **Bias Flow**:
 The small continuous flow through the circuit between breaths when flow triggering. The patient can draw on it; pulling harder than it supplies drops airway pressure.
 _Avoid_: flow-by, base flow

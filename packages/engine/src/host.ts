@@ -53,7 +53,8 @@ export class EngineHost {
       this.lastAlarmSilenced = silenced;
       this.post({ type: "alarms", events: step.alarms, active: s.alarms.activeAlarms, silenced });
     }
-    if (step.events.some((e) => e.type !== "breathStart" && e.type !== "plateauMeasured")) {
+    const quiet = new Set(["breathStart", "plateauMeasured", "asynchrony"]);
+    if (step.events.some((e) => !quiet.has(e.type))) {
       this.postState();
     }
   }

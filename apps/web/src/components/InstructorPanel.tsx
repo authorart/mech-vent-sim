@@ -13,7 +13,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { num } from "@/engine/format";
 import { usePbw, useStore } from "@/engine/store";
 import { caseLink, currentCase } from "@/engine/useEngine";
-import { messages as m } from "@/i18n";
+import { GUIDE_BY_KIND } from "@/guide/asynchrony";
+import { fmt, messages as m } from "@/i18n";
 
 function Slider({
   label,
@@ -277,6 +278,8 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
         <p className="text-xs text-ink-3">{m.cardiacHint}</p>
       </Section>
 
+      <AsynchronySection />
+
       <Section title={m.patient}>
         <Segmented<Sex>
           label="Sex"
@@ -437,5 +440,63 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
         {m.createdBy} {m.copyright}.
       </p>
     </aside>
+  );
+}
+
+/** Live asynchrony summary from the Engine's ground truth (M12, R6-Q10). */
+function AsynchronySection() {
+  const summary = useStore((s) => s.metrics?.asynchrony ?? null);
+  const log = useStore((s) => s.asynchronyLog);
+  const showLabels = useStore((s) => s.showLabels);
+  const now = useStore((s) => s.metrics?.t ?? 0);
+  const counts = summary
+    ? (Object.entries(summary.counts) as [keyof typeof GUIDE_BY_KIND, number][]).filter(
+        ([, n]) => n > 0,
+      )
+    : [];
+  return (
+    <Section title={m.asynchronyHeading}>
+      <span className="text-sm text-ink-2">{m.labelsOnWaveforms}</span>
+      <Segmented<"off" | "on">
+        label={m.labelsOnWaveforms}
+        value={showLabels ? "on" : "off"}
+        options={(["off", "on"] as const).map((v) => ({ value: v, label: m.onOff[v] }))}
+        onChange={(v) => useStore.setState({ showLabels: v === "on" })}
+      />
+      <p className="text-xs text-ink-3">{m.labelsHint}</p>
+      <div className="flex items-baseline gap-2">
+        <span className="text-sm text-ink-2">{m.asynchronyIndex}</span>
+        <span className="font-readout text-2xl text-ink">
+          {summary ? `${num(summary.index, 0)}%` : "–"}
+        </span>
+      </div>
+      <p className="text-xs text-ink-3">{m.asynchronyIndexHint}</p>
+      {counts.length === 0 ? (
+        <p className="text-sm text-ink-3">{m.asynchronyNone}</p>
+      ) : (
+        <ul className="flex flex-wrap gap-1.5 text-sm">
+          {counts.map(([kind, n]) => (
+            <li key={kind} className="rounded border border-edge px-2 py-0.5 text-ink-2">
+              {GUIDE_BY_KIND[kind].title} <span className="font-readout text-ink">{n}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {log.length > 0 && (
+        <div>
+          <div className="mb-1 text-sm text-ink-2">{m.asynchronyRecent}</div>
+          <ol className="space-y-0.5 text-sm">
+            {log.slice(0, 6).map((e) => (
+              <li key={`${e.t}-${e.kind}`} className="flex justify-between gap-2 text-ink-2">
+                <span>{GUIDE_BY_KIND[e.kind].title}</span>
+                <span className="tabular text-ink-3">
+                  {fmt(m.secondsAgo, { s: num(Math.max(0, now - e.t), 0) })}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </Section>
   );
 }

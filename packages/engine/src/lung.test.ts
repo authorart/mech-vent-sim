@@ -73,7 +73,7 @@ describe("COPD expiratory flow limitation (waterfall)", () => {
 
   it("PEEP up to the critical pressure doesn't raise Total PEEP; above it, it adds", () => {
     const at0 = totalPeep(0);
-    expect(totalPeep(7) - at0).toBeLessThan(0.5);
+    expect(totalPeep(6) - at0).toBeLessThan(0.5); // critical pressure 6
     expect(totalPeep(12) - at0).toBeGreaterThan(1.5);
     expect(at0).toBeGreaterThan(12); // PEEP_i ≈ 9 on PEEP 5 stays in the spec's range
   });
