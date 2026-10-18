@@ -116,12 +116,14 @@ function ModeDialog({
   mode,
   from,
   noEffort,
+  onApplied,
   onClose,
 }: {
   mode: Mode | null;
   from: VentSettings;
   /** The patient makes no effort (deep sedation or no drive). */
   noEffort: boolean;
+  onApplied: () => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -174,6 +176,7 @@ function ModeDialog({
           type="button"
           onClick={() => {
             send({ type: "applySettings", settings: draft });
+            onApplied();
             ref.current?.close();
           }}
           className="rounded bg-pending px-4 py-2 text-sm font-medium text-chrome hover:brightness-110"
@@ -194,8 +197,11 @@ export function SettingsStrip() {
 
   if (!engine) return null;
   const current = engine.pendingSettings ?? engine.settings;
-  const value = draft ?? current;
-  const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(current);
+  // Unconfirmed knob changes belong to one mode: once the mode changes (mode dialog, profile
+  // load, "Show me"), they are dropped, or the strip would keep showing the old mode.
+  const edits = draft?.mode === current.mode ? draft : null;
+  const value = edits ?? current;
+  const dirty = edits !== null && JSON.stringify(edits) !== JSON.stringify(current);
 
   const actions = (cls: string) => (
     <div className={cls}>
@@ -204,7 +210,7 @@ export function SettingsStrip() {
           <button
             type="button"
             onClick={() => {
-              send({ type: "applySettings", settings: draft });
+              send({ type: "applySettings", settings: edits });
               setDraft(null);
             }}
             className="rounded bg-pending px-5 py-2 font-medium text-chrome hover:brightness-110"
@@ -261,7 +267,7 @@ export function SettingsStrip() {
           <SettingsEditor
             value={value}
             base={current}
-            onChange={(u) => setDraft((d) => u(d ?? current))}
+            onChange={(u) => setDraft((d) => u(d?.mode === current.mode ? d : current))}
             showBackup={false}
             layout="strip"
           />
@@ -283,6 +289,7 @@ export function SettingsStrip() {
         mode={modeTarget}
         from={current}
         noEffort={engine.sedation === "deep" || engine.baseDrive.neuralRate === 0}
+        onApplied={() => setDraft(null)}
         onClose={() => setModeTarget(null)}
       />
     </section>
