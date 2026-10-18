@@ -13,7 +13,9 @@ export const en = {
   source: "Source: Hess & Kacmarek, Essentials of Mechanical Ventilation, 3rd ed.",
   showMe: "Show me on the simulator",
   showMeHint: "Loads this patient and settings, with labels on.",
-  exampleCaption: "Example from the simulator, 8 seconds. Markers show what was detected.",
+  exampleCaption: "Example from the simulator, 8 seconds. Markers show what was detected; this card's type is in bold.",
+  exampleCompare:
+    "Dashed line: the same breath with no patient effort. Shaded: the pressure the patient pulled away, their work against the fixed flow.",
   family: { Trigger: "Trigger asynchrony", Flow: "Flow asynchrony", Cycle: "Cycle asynchrony" },
   asynchronyHeading: "Asynchrony",
   labelsOnWaveforms: "Labels on the waveforms",

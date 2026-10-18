@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { num } from "@/engine/format";
 import { SWEEP_SECONDS } from "@/engine/ring";
-import { asynchronyMarks, sweep, useStore } from "@/engine/store";
+import { asynchronyMarks, breathStartTimes, sweep, useStore } from "@/engine/store";
 import { GUIDE_BY_KIND } from "@/guide/asynchrony";
+import { labelRows } from "@/guide/labels";
+import { passiveTemplate } from "@/guide/passive";
 import { messages as m } from "@/i18n";
 
 type Channel = "paw" | "flow" | "volume" | "pes" | "co2";
@@ -189,11 +191,13 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
       ctx.font = `12px ${family}`;
       ctx.textBaseline = "middle";
 
+      let pawRow: { top: number; yAt: (v: number) => number } | null = null;
       rowList.forEach((row, r) => {
         const top = r * (rowH + ROW_GAP);
         const data = sweep[row.channel];
         const [lo, hi] = row.range(...extent(data));
         const yAt = (v: number) => top + rowH - ((v - lo) / (hi - lo)) * rowH;
+        if (row.channel === "paw") pawRow = { top, yAt };
 
         // Recessive grid: zero line plus top and bottom ticks.
         ctx.strokeStyle = colors.grid;
@@ -237,37 +241,78 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
         ctx.stroke();
       });
 
-      // Asynchrony labels (instructor's choice): a tick on the flow trace and a short name.
+      // Asynchrony labels (instructor's choice): a tick on the flow trace and a short name,
+      // stacked in up to three rows so neighbours never overlap.
       if (labels) {
         const flowTop = rowH + ROW_GAP;
+        const onScreen = (t: number) => {
+          const i = Math.round(t * 100) % n;
+          const ts = sweep.t[i];
+          return ts !== undefined && Number.isFinite(ts) && Math.abs(ts - t) <= 0.02 ? i : -1;
+        };
+
+        // Flow starvation: the same breath with no patient effort, dashed on the pressure trace.
+        const engine = useStore.getState().engine;
+        const settings = engine?.settings;
+        const pr = pawRow as { top: number; yAt: (v: number) => number } | null;
+        if (engine && settings?.mode === "VCV" && pr) {
+          const starts = asynchronyMarks
+            .filter((mk) => mk.kind === "flowStarvation" && onScreen(mk.t) >= 0)
+            .map((mk) => breathStartTimes.filter((t) => t <= mk.t).at(-1))
+            .filter((t): t is number => t !== undefined);
+          if (starts.length > 0) {
+            const ref = passiveTemplate(engine.profileId, settings, engine.mechanics);
+            ctx.strokeStyle = colors.ink2;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 4]);
+            for (const start of starts) {
+              ctx.beginPath();
+              let pen = false;
+              ref.t.forEach((dt, k) => {
+                const i = onScreen(start + dt);
+                if (i < 0) {
+                  pen = false;
+                  return;
+                }
+                const y = Math.max(pr.top, pr.yAt(ref.paw[k]!));
+                if (pen) ctx.lineTo(xAt(i), y);
+                else ctx.moveTo(xAt(i), y);
+                pen = true;
+              });
+              ctx.stroke();
+            }
+            ctx.setLineDash([]);
+          }
+        }
+
         ctx.font = `11px ${family}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        let lastX = -Infinity;
-        for (const mark of asynchronyMarks) {
-          const i = Math.round(mark.t * 100) % n;
-          const ts = sweep.t[i];
-          // Only while that stretch of trace is still on screen.
-          if (ts === undefined || !Number.isFinite(ts) || Math.abs(ts - mark.t) > 0.02) continue;
-          const x = xAt(i);
+        const visible = asynchronyMarks
+          .map((mk) => ({ mk, i: onScreen(mk.t) }))
+          .filter((v) => v.i >= 0)
+          .map((v) => {
+            const text = GUIDE_BY_KIND[v.mk.kind].label;
+            return { text, x: xAt(v.i), width: ctx.measureText(text).width + 8 };
+          })
+          .sort((p, q) => p.x - q.x);
+        const rowsOf = labelRows(visible);
+        visible.forEach((v, k) => {
+          const y = flowTop + 18 + (rowsOf[k] ?? 0) * 16;
           ctx.strokeStyle = colors.ink2;
           ctx.globalAlpha = 0.7;
           ctx.setLineDash([3, 3]);
           ctx.beginPath();
-          ctx.moveTo(Math.round(x) + 0.5, flowTop + 18);
-          ctx.lineTo(Math.round(x) + 0.5, flowTop + rowH);
+          ctx.moveTo(Math.round(v.x) + 0.5, y + 15);
+          ctx.lineTo(Math.round(v.x) + 0.5, flowTop + rowH);
           ctx.stroke();
           ctx.setLineDash([]);
           ctx.globalAlpha = 1;
-          const text = GUIDE_BY_KIND[mark.kind].label;
-          const tw = ctx.measureText(text).width + 8;
-          const y = flowTop + 18 + (x - lastX < tw ? 15 : 0);
           ctx.fillStyle = colors.panel;
-          ctx.fillRect(x - tw / 2, y, tw, 15);
+          ctx.fillRect(v.x - v.width / 2, y, v.width, 15);
           ctx.fillStyle = colors.cursor;
-          ctx.fillText(text, x, y + 2);
-          lastX = x;
-        }
+          ctx.fillText(v.text, v.x, y + 2);
+        });
         ctx.font = `12px ${family}`;
         ctx.textBaseline = "middle";
       }

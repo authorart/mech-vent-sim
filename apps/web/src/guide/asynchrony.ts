@@ -19,6 +19,8 @@ export interface Example {
   features: PatientFeatures;
   /** What to look at once it is running. */
   watch: string;
+  /** Overlay the same breath with no patient effort (dashed), shading the patient's work. */
+  comparePassive?: boolean;
 }
 
 export interface GuideEntry {
@@ -180,27 +182,30 @@ export const GUIDE: GuideEntry[] = [
     family: "Flow",
     summary: "The ventilator gives less flow than the patient wants, so the patient works against it.",
     recognize: [
-      "VCV: the pressure trace is scooped out (concave) during inspiration and varies from breath to breath.",
-      "Pressure modes: a slow, concave pressure rise that sags below the set level early in the breath.",
-      "Clinically: fast breathing, retractions, chest–abdominal paradox.",
+      "VCV (fixed flow): the pressure rise caves in (scooped, concave) instead of climbing in a straight line, then curves up toward the end of the breath.",
+      "Compare with a passive breath at the same settings (dashed line in the example): the gap between the two is the patient's work against the ventilator.",
+      "The scoop changes from breath to breath with the patient's effort; in severe cases pressure falls below PEEP early in the breath.",
+      "Pressure modes: a slow, concave rise that sags below the set pressure early in the breath. Clinically: fast breathing, retractions, chest–abdominal paradox.",
     ],
     why: [
-      "In VCV the flow is fixed by the settings; a patient with high demand can't get more, so the extra effort shows as lower airway pressure.",
+      "In VCV the flow is fixed by the settings; when the patient's demand is higher, the extra effort can't get more gas and shows up as lower airway pressure.",
       "In PCV/PSV a rise time that is too slow for the demand.",
+      "It adds work of breathing (Marini: lowering flow from 82 to 40 L/min raised work by more than 50%) and can lead to double triggering.",
     ],
     fix: [
-      "Raise the peak flow (note this shortens Ti and can cause double triggering) or use a decelerating ramp.",
+      "Raise the peak flow so it meets the demand (note: this shortens Ti and can cause double triggering), or use a decelerating ramp.",
       "Switch to PCV or PSV, where flow follows demand; shorten the rise time.",
-      "Treat the cause of high demand.",
+      "Treat the cause of high demand (hypoxemia, acidosis, pain, anxiety).",
     ],
     source: "Ch. 15 (flow asynchrony, fig. 15-6), ch. 7, ch. 31 (fig. 31-1)",
     example: {
-      profileId: "ards",
-      settings: { ...INITIAL_SETTINGS, peakFlow: 40 / 60, tidalVolume: 0.4 },
+      profileId: "cardiogenicEdema",
+      settings: { ...INITIAL_SETTINGS, peakFlow: 40 / 60 },
       sedation: "awake",
       features: features(),
+      comparePassive: true,
       watch:
-        "Peak flow 40 L/min: the pressure trace caves in during each breath. Raise the flow or switch to PCV and the scooping goes away.",
+        "VCV with peak flow 40 L/min in a breathless patient: each breath's pressure caves in mid-breath. Raise the flow to 80 L/min, or switch to PCV, and the pressure rise straightens out.",
     },
   },
   {

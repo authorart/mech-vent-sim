@@ -68,6 +68,8 @@ export const sweep = new SweepBuffer();
 
 /** Asynchrony events for the waveform labels (outside React state, like `sweep`). */
 export const asynchronyMarks: AsynchronyMark[] = [];
+/** Recent breath start times, to anchor reference curves on the waveforms. */
+export const breathStartTimes: number[] = [];
 const MAX_MARKS = 80;
 /** Breaths averaged per PEEP level in the PEEP trial. */
 const PEEP_TRIAL_BREATHS = 8;
@@ -111,6 +113,7 @@ export const useStore = create<Store>((set, get) => ({
         if (prev && prev.profileId !== msg.state.profileId) {
           sweep.clear();
           asynchronyMarks.length = 0;
+          breathStartTimes.length = 0;
           set({
             metrics: null,
             gas: null,
@@ -157,6 +160,8 @@ export const useStore = create<Store>((set, get) => ({
         const e = msg.event;
         if (e.type === "breathStart") {
           sweep.markBreathStart(e.t);
+          breathStartTimes.push(e.t);
+          if (breathStartTimes.length > MAX_MARKS) breathStartTimes.shift();
           return;
         }
         if (e.type === "asynchrony") {

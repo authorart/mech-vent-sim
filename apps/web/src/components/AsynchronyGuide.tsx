@@ -1,26 +1,59 @@
 "use client";
 
+import type { AsynchronyKind } from "@mech-vent/engine";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/engine/store";
 import { GUIDE, GUIDE_BY_KIND, type GuideEntry } from "@/guide/asynchrony";
 import { runExample, type ExampleTrace } from "@/guide/example";
+import { labelRows, labelWidth } from "@/guide/labels";
 import { messages as m } from "@/i18n";
 
 const W = 640;
 const ROW = 96;
 const GAP = 14;
-const H = ROW * 2 + GAP + 22;
+const LANE = 14;
 
 /** Pressure and flow of an example, with the detected asynchronies marked. */
-function ExampleChart({ trace }: { trace: ExampleTrace }) {
+function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: AsynchronyKind }) {
   const tMax = trace.t.at(-1) ?? 8;
   const x = (t: number) => (t / tMax) * W;
-  const pHi = Math.max(20, Math.ceil(Math.max(...trace.paw) / 10) * 10);
+
+  // Event labels in up to three rows above the plot so they never overlap.
+  const labels = trace.marks.map((mk) => ({
+    ...mk,
+    text: GUIDE_BY_KIND[mk.kind].label,
+    x: x(mk.t),
+  }));
+  const rows = labelRows(labels.map((l) => ({ x: l.x, width: labelWidth(l.text) })));
+  const lanes = Math.max(1, ...rows.map((r) => r + 1));
+  const top = lanes * LANE + 8;
+  const H = top + ROW * 2 + GAP + 4;
+
+  const passiveMax = Math.max(0, ...trace.passive.flatMap((p) => p.paw));
+  const pHi = Math.max(20, Math.ceil(Math.max(...trace.paw, passiveMax) / 10) * 10);
+  const pLo = Math.min(0, Math.floor(Math.min(...trace.paw) / 5) * 5);
   const fAbs = Math.max(30, Math.ceil(Math.max(...trace.flow.map(Math.abs)) / 30) * 30);
-  const yP = (p: number) => 22 + ROW - (Math.max(0, p) / pHi) * ROW;
-  const yF = (f: number) => 22 + ROW + GAP + ROW / 2 - (f / fAbs) * (ROW / 2);
+  const yP = (p: number) => top + ROW - ((p - pLo) / (pHi - pLo)) * ROW;
+  const yF = (f: number) => top + ROW + GAP + ROW / 2 - (f / fAbs) * (ROW / 2);
   const line = (ys: number[], y: (v: number) => number) =>
     ys.map((v, i) => `${x(trace.t[i]!).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const pawAt = (t: number) => {
+    const k = Math.round((t / tMax) * (trace.t.length - 1));
+    return trace.paw[Math.min(trace.t.length - 1, Math.max(0, k))]!;
+  };
+
+  // Passive comparison: dashed curve per breath, and the shaded gap (the patient's work).
+  const passive = trace.passive
+    .filter((p) => p.start >= 0 && p.start + (p.t.at(-1) ?? 0) <= tMax)
+    .map((p) => {
+      const pts = p.t.map((dt, i) => [p.start + dt, p.paw[i]!] as const);
+      const dashed = pts.map(([t, v]) => `${x(t).toFixed(1)},${yP(v).toFixed(1)}`).join(" ");
+      const under = pts
+        .map(([t]) => `${x(t).toFixed(1)},${yP(pawAt(t)).toFixed(1)}`)
+        .reverse()
+        .join(" ");
+      return { dashed, area: `${dashed} ${under}`, key: p.start };
+    });
 
   return (
     <svg
@@ -31,26 +64,49 @@ function ExampleChart({ trace }: { trace: ExampleTrace }) {
     >
       <line x1="0" x2={W} y1={yF(0)} y2={yF(0)} stroke="var(--grid)" />
       <line x1="0" x2={W} y1={yP(0)} y2={yP(0)} stroke="var(--grid)" />
-      <text x="4" y={22 + 11} fill="var(--ink-3)" fontSize="11">
+      <text x="4" y={top + 11} fill="var(--ink-3)" fontSize="11">
         Paw {pHi} cmH₂O
       </text>
-      <text x="4" y={22 + ROW + GAP + 11} fill="var(--ink-3)" fontSize="11">
+      <text x="4" y={top + ROW + GAP + 11} fill="var(--ink-3)" fontSize="11">
         Flow ±{fAbs} L/min
       </text>
-      {trace.marks.map((mk, i) => (
-        <g key={i}>
-          <line
-            x1={x(mk.t)}
-            x2={x(mk.t)}
-            y1="18"
-            y2={H}
+      {labels.map((l, i) => {
+        const own = l.kind === focus;
+        const y = (rows[i] ?? 0) * LANE + 11;
+        return (
+          <g key={i}>
+            <line
+              x1={l.x}
+              x2={l.x}
+              y1={y + 3}
+              y2={H}
+              stroke={own ? "var(--ink-2)" : "var(--ink-3)"}
+              strokeDasharray="3 3"
+              opacity={own ? 0.8 : 0.45}
+            />
+            <text
+              x={l.x}
+              y={y}
+              fill={own ? "var(--ink)" : "var(--ink-3)"}
+              fontSize="11"
+              fontWeight={own ? 600 : 400}
+              textAnchor="middle"
+            >
+              {l.text}
+            </text>
+          </g>
+        );
+      })}
+      {passive.map((p) => (
+        <g key={p.key}>
+          <polygon points={p.area} fill="var(--trace-pressure)" opacity="0.18" />
+          <polyline
+            points={p.dashed}
+            fill="none"
             stroke="var(--ink-2)"
-            strokeDasharray="3 3"
-            opacity="0.7"
+            strokeWidth="1.5"
+            strokeDasharray="5 4"
           />
-          <text x={x(mk.t)} y="12" fill="var(--ink)" fontSize="11" textAnchor="middle">
-            {GUIDE_BY_KIND[mk.kind].label}
-          </text>
         </g>
       ))}
       <polyline
@@ -92,8 +148,10 @@ function Card({ entry, onShow }: { entry: GuideEntry; onShow: () => void }) {
         <p className="mt-1 max-w-prose text-ink-2">{entry.summary}</p>
       </header>
       <figure className="rounded-md border border-edge bg-glass p-2">
-        <ExampleChart trace={trace} />
-        <figcaption className="px-1 pt-1 text-xs text-ink-3">{m.exampleCaption}</figcaption>
+        <ExampleChart trace={trace} focus={entry.kind} />
+        <figcaption className="px-1 pt-1 text-xs text-ink-3">
+          {m.exampleCaption} {entry.example.comparePassive && m.exampleCompare}
+        </figcaption>
       </figure>
       <div className="grid gap-5 md:grid-cols-3">
         {list(m.recognize, entry.recognize)}
