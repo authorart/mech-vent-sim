@@ -262,6 +262,19 @@ export function InstructorPanel({ open, onClose }: { open: boolean; onClose: () 
           }
         />
         <p className="text-xs text-ink-3">{m.reverseTriggeringHint}</p>
+        <span className="text-sm text-ink-2">{m.cardiacOscillation}</span>
+        <Segmented<PatientFeatures["cardiacOscillation"]>
+          label={m.cardiacOscillation}
+          value={engine.features.cardiacOscillation}
+          options={(["off", "small", "strong"] as const).map((v) => ({
+            value: v,
+            label: m.cardiacLevel[v],
+          }))}
+          onChange={(cardiacOscillation) =>
+            send({ type: "setPatientFeatures", features: { cardiacOscillation } })
+          }
+        />
+        <p className="text-xs text-ink-3">{m.cardiacHint}</p>
       </Section>
 
       <Section title={m.patient}>

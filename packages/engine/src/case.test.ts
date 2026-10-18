@@ -11,7 +11,12 @@ const base: CaseState = {
   sex: "female",
   heightCm: 160,
   patch: { mechanics: { rExp: 70 } },
-  features: { breathing: "regular", agitation: "moderate", reverseTriggering: true },
+  features: {
+    breathing: "regular",
+    agitation: "moderate",
+    reverseTriggering: true,
+    cardiacOscillation: "strong",
+  },
 };
 
 describe("Case links", () => {
@@ -32,6 +37,7 @@ describe("Case links", () => {
       breathing: "natural",
       agitation: "none",
       reverseTriggering: false,
+      cardiacOscillation: "small",
     });
   });
 

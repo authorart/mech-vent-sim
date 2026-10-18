@@ -153,6 +153,22 @@ _Avoid_: late cycling, prolonged Ti
 The ventilator's inspiration ending before the patient's; the continuing effort can cause a Double Trigger.
 _Avoid_: early cycling, short cycling
 
+**Autotrigger**:
+A breath triggered by something other than patient effort, such as the heartbeat's ripple in the flow signal or a leak.
+_Avoid_: false trigger, self-cycling
+
+**Cardiogenic Oscillation**:
+The small ripple in airway flow and pressure at the heart rate, from the heart beating against the lungs.
+_Avoid_: cardiac artifact, heart noise
+
+**Rise Time**:
+How quickly a pressure-control or pressure-support breath reaches its set pressure. Too fast overshoots the set pressure; too slow against a strong pull gives a concave, sagging rise.
+_Avoid_: slope, ramp
+
+**Pressure Cycling**:
+A pressure-support breath ending because airway pressure climbed a few cmH2O above the set level, usually because the patient pushed against it.
+_Avoid_: pressure limit (that's the high-pressure alarm), pop-off
+
 **Flow Starvation**:
 The patient demanding more flow than a volume-controlled breath delivers. It shows as a scooped-out airway pressure trace.
 _Avoid_: air hunger (that's a symptom, not a waveform)

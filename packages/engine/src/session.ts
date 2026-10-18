@@ -1,5 +1,6 @@
 import {
   AGITATION_EFFECT,
+  CARDIAC_OSCILLATION,
   chemoreflexMultiplier,
   DEFAULT_FEATURES,
   effectiveDrive,
@@ -37,6 +38,8 @@ export interface SessionOptions extends SimulatorOptions {
   features?: PatientFeatures;
   /** Seed for the breathing variability (default 1), so a case replays the same breaths. */
   seed?: number;
+  /** Seed for display noise (default seed + 1000); null turns noise off. */
+  noiseSeed?: number | null;
 }
 
 /** Healthy adult gas exchange, used when a Session is created without profile values. */
@@ -91,8 +94,9 @@ export class Session {
         drive: effectiveDrive(this.baseDrive, this.sedation, 1, this.features.agitation),
       },
       variability: this.variability(),
+      noiseSeed: opts.noiseSeed === undefined ? this.seed + 1000 : opts.noiseSeed,
     });
-    this.sim.reverseTriggering = this.features.reverseTriggering;
+    this.applyFeatures();
     this.alarms = new AlarmEngine(opts.alarmLimits);
     this.gas = new GasExchange({ ...(opts.gas ?? NORMAL_GAS) });
     this.circulation = new Circulation({ ...(opts.circulation ?? NORMAL_CIRCULATION) });
@@ -111,8 +115,13 @@ export class Session {
   setFeatures(patch: Partial<PatientFeatures>): void {
     this.features = { ...this.features, ...patch };
     this.sim.effort.setVariability(this.variability());
-    this.sim.reverseTriggering = this.features.reverseTriggering;
+    this.applyFeatures();
     this.updateDrive();
+  }
+
+  private applyFeatures(): void {
+    this.sim.reverseTriggering = this.features.reverseTriggering;
+    this.sim.cardiacAmplitude = CARDIAC_OSCILLATION[this.features.cardiacOscillation];
   }
 
   private variability(): EffortVariability | null {
@@ -135,6 +144,7 @@ export class Session {
 
   advance(seconds: number): SessionStep {
     this.updateDrive();
+    this.sim.heartRate = this.circulation.state?.hr ?? this.circulation.params.hr;
     const r = this.sim.advance(seconds);
     const alarms: AlarmEvent[] = [];
     const metrics: BreathMetrics[] = [];
@@ -220,6 +230,8 @@ export interface ProfileSessionOptions {
   settings?: VentSettings;
   sedation?: SedationLevel;
   features?: PatientFeatures;
+  /** Display-noise seed; null turns noise off (default: on). */
+  noiseSeed?: number | null;
   alarmLimits?: AlarmLimits;
   firstEffortAt?: number;
 }
@@ -235,6 +247,7 @@ export function createProfileSession(id: ProfileId, opts: ProfileSessionOptions 
     referencePh: p.referencePh,
     sedation: opts.sedation ?? p.startSedation,
     ...(opts.features ? { features: opts.features } : {}),
+    ...(opts.noiseSeed !== undefined ? { noiseSeed: opts.noiseSeed } : {}),
     ...(opts.alarmLimits ? { alarmLimits: opts.alarmLimits } : {}),
     ...(opts.firstEffortAt !== undefined ? { firstEffortAt: opts.firstEffortAt } : {}),
   });

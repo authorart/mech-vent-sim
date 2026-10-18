@@ -67,6 +67,7 @@ export {
   chemoreflexMultiplier,
   effectiveDrive,
   AGITATION_EFFECT,
+  CARDIAC_OSCILLATION,
   DEFAULT_FEATURES,
   WAKEFULNESS_FLOOR,
   type Agitation,

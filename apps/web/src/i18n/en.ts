@@ -68,6 +68,10 @@ export const en = {
   agitationHint: "Stronger, faster and more irregular efforts while the patient is not deeply sedated.",
   reverseTriggering: "Reverse triggering",
   onOff: { off: "Off", on: "On" },
+  cardiacOscillation: "Heartbeat ripple",
+  cardiacLevel: { off: "Off", small: "Small", strong: "Strong" },
+  cardiacHint:
+    "The heart beating against the lungs adds a small ripple to flow and pressure. Strong ripple (4–6 L/min) can autotrigger a sensitive flow trigger; making the trigger less sensitive stops it.",
   reverseTriggeringHint:
     "A deeply sedated patient makes an effort in response to each machine breath, about 0.5 s after it starts. It can trigger a second, stacked breath.",
   patient: "Patient",

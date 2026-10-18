@@ -3,6 +3,7 @@
  * scooped, the P–V curve bends at high volume, and the expiratory circuit rounds the pressure.
  */
 import { describe, expect, it } from "vitest";
+import { DEFAULT_FEATURES } from "./drive";
 import { PROFILES, type ProfileId } from "./profiles";
 import { createProfileSession } from "./session";
 import { INITIAL_SETTINGS, settingsForMode } from "./settings";
@@ -79,6 +80,7 @@ describe("Overdistension", () => {
     const cstat = (vt: number) => {
       const s = createProfileSession("ards", {
         settings: { ...INITIAL_SETTINGS, tidalVolume: vt, highPressureLimit: 80 },
+        features: { ...DEFAULT_FEATURES, cardiacOscillation: "off" },
       });
       s.advance(20);
       s.sim.inspiratoryPause();

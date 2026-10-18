@@ -1,3 +1,4 @@
+import { mulberry32, normalFrom } from "./random";
 import type { Drive } from "./types";
 
 /** Breath-to-breath variation of the patient's own effort (R6-Q4). Coefficients of variation. */
@@ -41,18 +42,6 @@ interface Cycle {
   /** Multiplier on the drive's peak Muscle Pressure, or an absolute peak for entrained efforts. */
   amplitude: number;
   sigh: boolean;
-}
-
-/** Deterministic PRNG (mulberry32), so a seed replays the same breathing. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -157,11 +146,7 @@ export class PatientEffort {
     const v = this.variability;
     const rnd = this.random;
     if (!v || !rnd) return { start, period, ti: inspFraction * period, amplitude: 1, sigh: false };
-    // Box–Muller normal deviates from the seeded sequence.
-    const normal = () => {
-      const u = Math.max(rnd(), 1e-12);
-      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd());
-    };
+    const normal = normalFrom(rnd);
     let p = period * clamp(1 + v.cvRate * normal(), 0.6, 1.6);
     let fraction = clamp(inspFraction * (1 + v.cvTi * normal()), 0.2, 0.55);
     let amplitude = clamp(1 + v.cvAmplitude * normal(), 0.4, 1.8);

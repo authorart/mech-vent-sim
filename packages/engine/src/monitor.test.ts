@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AlarmEvent } from "./alarms";
 import type { BreathMetrics } from "./monitor";
+import { DEFAULT_FEATURES } from "./drive";
 import { Session } from "./session";
 import { CIRCUIT_RESISTANCE, FLOW_RAMP_TIME } from "./simulator";
 import type { Drive, Mechanics, PsvSettings, VcvSettings, VentSettings } from "./types";
@@ -38,7 +39,12 @@ const psv: PsvSettings = {
 };
 
 function session(mechanics: Mechanics, settings: VentSettings, drive = passive) {
-  return new Session({ patient: { mechanics, drive }, settings });
+  // No heartbeat ripple: these tests check exact formulas.
+  return new Session({
+    patient: { mechanics, drive },
+    settings,
+    features: { ...DEFAULT_FEATURES, cardiacOscillation: "off" },
+  });
 }
 
 const lastMetrics = (m: BreathMetrics[]): BreathMetrics => {

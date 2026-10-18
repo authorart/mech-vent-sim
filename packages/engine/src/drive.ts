@@ -13,12 +13,25 @@ export interface PatientFeatures {
   agitation: Agitation;
   /** Passive ventilator breaths entrain a patient effort (R6-Q2). */
   reverseTriggering: boolean;
+  /** Heartbeat ripple in the airway signals: off, small (the usual) or strong (can autotrigger). */
+  cardiacOscillation: "off" | "small" | "strong";
 }
+
+/**
+ * Cardiogenic oscillation amplitude (cmH2O). Strong gives about 4–6 L/min of flow ripple at the
+ * airway in normal lungs, enough to autotrigger a 2 L/min flow trigger (Hess & Kacmarek fig. 15-2).
+ */
+export const CARDIAC_OSCILLATION: Record<PatientFeatures["cardiacOscillation"], number> = {
+  off: 0,
+  small: 0.12,
+  strong: 0.7,
+};
 
 export const DEFAULT_FEATURES: PatientFeatures = {
   breathing: "natural",
   agitation: "none",
   reverseTriggering: false,
+  cardiacOscillation: "small",
 };
 
 /** Agitation multiplies Muscle Pressure, neural rate and the variability coefficients. */

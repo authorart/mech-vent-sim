@@ -128,6 +128,10 @@ function decodeFeatures(f: unknown): PatientFeatures {
     breathing: f.breathing === "regular" ? "regular" : "natural",
     agitation: f.agitation === "moderate" || f.agitation === "severe" ? f.agitation : "none",
     reverseTriggering: f.reverseTriggering === true,
+    cardiacOscillation:
+      f.cardiacOscillation === "strong" || f.cardiacOscillation === "off"
+        ? f.cardiacOscillation
+        : "small",
   };
 }
 

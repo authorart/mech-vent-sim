@@ -142,6 +142,8 @@ export interface BreathRecord {
   cycleFlow: number;
   /** Inspiration was ended by the high pressure limit. */
   highPressureCycled: boolean;
+  /** What ended inspiration: set time (VCV/PCV/backup), PSV flow (Esens), PSV pressure, or the high pressure limit. */
+  cycle: CycleReason;
 }
 
 export type EngineEvent =
@@ -160,6 +162,8 @@ export type EngineEvent =
     };
 
 /** Interleaved Sample layout in the output Float32Array. */
+export type CycleReason = "time" | "flow" | "pressure" | "highPressure";
+
 export const SAMPLE = {
   T: 0,
   PAW: 1,

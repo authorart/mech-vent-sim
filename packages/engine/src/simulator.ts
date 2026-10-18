@@ -1,8 +1,10 @@
 import { PatientEffort, type EffortVariability } from "./effort";
+import { mulberry32, normalFrom } from "./random";
 import { LinearLung } from "./lung";
 import type {
   BreathRecord,
   BreathTrigger,
+  CycleReason,
   EngineEvent,
   Mode,
   Patient,
@@ -49,10 +51,32 @@ export const FLOW_RAMP_TIME = 0.05;
  * Pressure, building with PEXP_RISE and fading with PEXP_FALL time constants (s).
  */
 export const PEXP_GAIN = 0.8;
-export const PEXP_RISE = 0.15;
+export const PEXP_RISE = 0.08;
 export const PEXP_FALL = 0.2;
 /** Grace after neural inspiration ends before expiratory muscles join in (s). */
 export const PEXP_DELAY = 0.05;
+
+/**
+ * Pressure servo for PCV/PSV (M10, Hess & Kacmarek ch. 7, 9). The rise time sets how fast the
+ * ventilator may ramp its flow, up to SERVO_MAX_FLOW (L/s). The flow valve answers like an
+ * underdamped second-order system, so a very fast rise overshoots the set pressure and a slow
+ * rise against a strong patient pull gives a concave, sagging pressure rise.
+ */
+export const SERVO_MAX_FLOW = 3;
+export const SERVO_MIN_RISE = 0.02;
+export const SERVO_NATURAL_FREQ = 80; // rad/s
+export const SERVO_DAMPING = 0.5;
+/** The valve can cut flow no faster than this (L/s²): a sudden drop in demand briefly overshoots pressure. */
+export const SERVO_MAX_DECEL = 12;
+/** The active exhalation valve vents gas once airway pressure passes the target by this much. */
+export const RELIEF_PRESSURE = 4;
+/** PSV secondary cycle criterion: airway pressure this far above target ends the breath. */
+export const PSV_PRESSURE_CYCLE = 3;
+/** Pressure cycling is ignored this long after the rise, so a start-up overshoot can't end the breath (s). */
+export const PSV_PRESSURE_CYCLE_GUARD = 0.15;
+
+/** Displayed-signal noise (1 SD): pressure cmH2O, flow L/s. Physics and metrics stay noise-free. */
+export const SIGNAL_NOISE = { paw: 0.04, flow: 0.004 };
 
 export interface AdvanceResult {
   /** Interleaved Samples; see `SAMPLE` for the layout. */
@@ -67,7 +91,9 @@ type Control =
   | { kind: "flow"; q: (t: number) => number }
   | { kind: "pressure"; paw: (t: number) => number }
   | { kind: "closed" }
-  | { kind: "expiratory"; peep: number; oneWay: boolean; /** L/s, flow triggering only */ bias: number };
+  | { kind: "expiratory"; peep: number; oneWay: boolean; /** L/s, flow triggering only */ bias: number }
+  /** PCV/PSV: the servo's delivered flow, with exhalation-valve relief above `relief` cmH2O. */
+  | { kind: "servo"; q: number; relief: number };
 
 /** The breath currently being delivered, resolved from settings at breath start. */
 type ActiveBreath =
@@ -97,6 +123,7 @@ interface BreathAccumulator {
   peakInspFlow: number;
   cycleFlow: number;
   highPressureCycled: boolean;
+  cycle: CycleReason;
 }
 
 export interface SimulatorOptions {
@@ -106,6 +133,8 @@ export interface SimulatorOptions {
   firstEffortAt?: number;
   /** Breath-to-breath variability of the patient's effort (default: none, every cycle identical). */
   variability?: EffortVariability | null;
+  /** Seeded measurement noise on the displayed pressure and flow (default off). */
+  noiseSeed?: number | null;
 }
 
 /**
@@ -143,6 +172,18 @@ export class Simulator {
   /** When the effort that belongs to the current breath stops breathing in (null = none). */
   private breathNeuralEnd: number | null = null;
 
+  /** Servo flow (L/s) and its rate of change, during PCV/PSV inspiration. */
+  private ventFlow = 0;
+  private ventFlowRate = 0;
+
+  /** Heart rate (beats/min) and the cardiogenic oscillation it drives (cmH2O amplitude). */
+  heartRate = 80;
+  cardiacAmplitude = 0;
+  private cardiacPhase = 0;
+  private pcard = 0;
+
+  private noise: (() => number) | null = null;
+
   /** Largest Muscle Pressure seen during the current pause or hold. */
   private maneuverEffort = 0;
   private inspPauseRequested = false;
@@ -164,6 +205,7 @@ export class Simulator {
       opts.variability ?? null,
     );
     this.volume = this.lung.volumeAtPressure(this.settings.peep);
+    if (opts.noiseSeed != null) this.noise = normalFrom(mulberry32(opts.noiseSeed));
     this.lastPaw = this.settings.peep;
     if (this.settings.mode !== "PSV") this.startBreath(0, "mandatory");
   }
@@ -236,6 +278,7 @@ export class Simulator {
 
   private tick(): void {
     const t0 = this.step * DT;
+    this.updateServo(t0);
     const control = this.control();
 
     // RK4 on elastic volume.
@@ -252,7 +295,7 @@ export class Simulator {
 
     const t = this.step * DT;
     const pmus = this.effort.pmus(t);
-    const net = pmus - this.pexp;
+    const net = pmus - this.pexp - this.pcard;
     const flow = this.flowFor(control, t, this.volume);
     const paw = this.pawFor(control, t, this.volume, net, flow);
     const palv = this.lung.alveolarPressure(this.volume, net);
@@ -274,9 +317,19 @@ export class Simulator {
     }
 
     if (this.step % OUTPUT_EVERY === 0) {
-      this.outSamples.push(t, paw, flow, this.displayVolume, palv, pmus, this.pexp);
+      const n = this.noise;
+      this.outSamples.push(
+        t,
+        n ? paw + SIGNAL_NOISE.paw * n() : paw,
+        n ? flow + SIGNAL_NOISE.flow * n() : flow,
+        this.displayVolume,
+        palv,
+        pmus,
+        this.pexp,
+      );
     }
     this.updateExpiratoryMuscles(t);
+    this.updateCardiac();
 
     this.transition(t, flow, paw);
   }
@@ -299,13 +352,51 @@ export class Simulator {
     this.pexp += (target - this.pexp) * Math.min(1, DT / tau);
   }
 
+  /** The heart beating against the lungs: a small pressure ripple at the heart rate. */
+  private updateCardiac(): void {
+    this.cardiacPhase = (this.cardiacPhase + (this.heartRate / 60) * DT) % 1;
+    this.pcard = this.cardiacAmplitude * Math.sin(2 * Math.PI * this.cardiacPhase);
+  }
+
+  /** Target airway pressure of the current PCV/PSV breath. */
+  private pressureTarget(b: ActiveBreath): number {
+    return this.settings.peep + (b.kind === "PCV" ? b.pInsp : b.kind === "PSV" ? b.pSupport : 0);
+  }
+
+  /** Advance the pressure servo's flow by one step (see SERVO_MAX_FLOW). */
+  private updateServo(t: number): void {
+    const b = this.breath;
+    if (this.phase !== "inspiration" || !b || b.kind === "VCV") {
+      this.ventFlow = 0;
+      this.ventFlowRate = 0;
+      return;
+    }
+    const tIn = t - this.phaseStart;
+    const net = this.effort.pmus(t) - this.pexp - this.pcard;
+    const need = Math.max(0, this.lung.flow(this.pressureTarget(b), this.volume, net));
+    const cap = SERVO_MAX_FLOW * Math.min(1, tIn / Math.max(b.riseTime, SERVO_MIN_RISE));
+    const command = Math.min(need, cap);
+    const w = SERVO_NATURAL_FREQ;
+    const accel = w * w * (command - this.ventFlow) - 2 * SERVO_DAMPING * w * this.ventFlowRate;
+    this.ventFlowRate = Math.max(-SERVO_MAX_DECEL, this.ventFlowRate + accel * DT);
+    this.ventFlow += this.ventFlowRate * DT;
+    if (this.ventFlow < 0) {
+      this.ventFlow = 0;
+      this.ventFlowRate = 0;
+    }
+  }
+
   private flowFor(control: Control, t: number, v: number): number {
-    const pmus = this.effort.pmus(t) - this.pexp;
+    const pmus = this.effort.pmus(t) - this.pexp - this.pcard;
     switch (control.kind) {
       case "flow":
         return control.q(t);
       case "pressure":
         return this.lung.flow(control.paw(t), v, pmus);
+      case "servo":
+        return this.lung.pressureForFlow(control.q, v, pmus) > control.relief
+          ? this.lung.flow(control.relief, v, pmus)
+          : control.q;
       case "closed":
         return 0;
       case "expiratory": {
@@ -322,6 +413,8 @@ export class Simulator {
         return this.lung.pressureForFlow(flow, v, pmus);
       case "pressure":
         return control.paw(t);
+      case "servo":
+        return Math.min(this.lung.pressureForFlow(flow, v, pmus), control.relief);
       case "closed":
         return this.lung.alveolarPressure(v, pmus);
       case "expiratory":
@@ -371,14 +464,8 @@ export class Simulator {
         };
       }
       case "PCV":
-      case "PSV": {
-        const dp = b.kind === "PCV" ? b.pInsp : b.pSupport;
-        const rise = b.riseTime;
-        return {
-          kind: "pressure",
-          paw: (t) => peep + dp * (rise > 0 ? Math.min(1, (t - start) / rise) : 1),
-        };
-      }
+      case "PSV":
+        return { kind: "servo", q: this.ventFlow, relief: this.pressureTarget(b) + RELIEF_PRESSURE };
     }
   }
 
@@ -429,7 +516,7 @@ export class Simulator {
       if (this.acc) this.acc.highPressureCycled = true;
       this.outEvents.push({ type: "highPressureCycle", t, paw });
       this.inspPauseRequested = false;
-      this.endInspiration(t, flow, 0);
+      this.endInspiration(t, flow, 0, "highPressure");
       return;
     }
     switch (b.kind) {
@@ -439,12 +526,22 @@ export class Simulator {
       case "PCV":
         if (tIn >= b.inspTime - DT / 2) this.endInspiration(t, flow, 0);
         break;
-      case "PSV":
+      case "PSV": {
         this.psvPeakFlow = Math.max(this.psvPeakFlow, flow);
-        if ((tIn >= b.riseTime && flow <= b.esens * this.psvPeakFlow) || tIn >= MAX_PSV_INSP_TIME) {
-          this.endInspiration(t, flow, 0);
+        const rise = Math.max(b.riseTime, SERVO_MIN_RISE);
+        if (tIn >= rise && flow <= b.esens * this.psvPeakFlow) {
+          this.endInspiration(t, flow, 0, "flow");
+        } else if (
+          tIn >= rise + PSV_PRESSURE_CYCLE_GUARD &&
+          paw > this.pressureTarget(b) + PSV_PRESSURE_CYCLE
+        ) {
+          // The patient is actively exhaling against the breath (Hess & Kacmarek fig. 15-9).
+          this.endInspiration(t, flow, 0, "pressure");
+        } else if (tIn >= MAX_PSV_INSP_TIME) {
+          this.endInspiration(t, flow, 0, "time");
         }
         break;
+      }
     }
   }
 
@@ -501,8 +598,14 @@ export class Simulator {
     return s.rate;
   }
 
-  private endInspiration(t: number, flow: number, setPause: number): void {
+  private endInspiration(
+    t: number,
+    flow: number,
+    setPause: number,
+    cycle: CycleReason = "time",
+  ): void {
     if (this.acc) {
+      this.acc.cycle = cycle;
       this.acc.cycleFlow = flow;
       this.acc.endInspRecoil = this.recoil;
       this.acc.endInspPaw = this.lastPaw;
@@ -571,6 +674,7 @@ export class Simulator {
       peakInspFlow: 0,
       cycleFlow: 0,
       highPressureCycled: false,
+      cycle: "time",
     };
     this.outEvents.push({ type: "breathStart", t, trigger });
   }
@@ -628,6 +732,7 @@ export class Simulator {
       peakInspFlow: a.peakInspFlow,
       cycleFlow: a.cycleFlow,
       highPressureCycled: a.highPressureCycled,
+      cycle: a.cycle,
     });
     this.acc = null;
   }

@@ -32,7 +32,7 @@ function run(
   const s = createProfileSession(id, {
     settings,
     sedation,
-    features: { ...DEFAULT_FEATURES, breathing: "regular", ...features },
+    features: { ...DEFAULT_FEATURES, breathing: "regular", cardiacOscillation: "off", ...features },
   });
   s.advance(40);
   const r = s.sim.advance(seconds);
