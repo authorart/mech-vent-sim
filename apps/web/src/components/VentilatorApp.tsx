@@ -28,7 +28,11 @@ export function VentilatorApp() {
   const [guide, setGuide] = useState(false);
 
   return (
-    <div className="flex min-h-screen flex-col lg:h-screen lg:min-h-0">
+    // Desktop: the Instructor panel docks on the right and everything else shifts left, so the
+    // waveforms, numbers and settings stay in view. Phones keep it as an overlay.
+    <div
+      className={`flex min-h-screen flex-col lg:h-screen lg:min-h-0 ${instructor ? "lg:pr-[360px]" : ""}`}
+    >
       <TopBar onInstructor={() => setInstructor((v) => !v)} onGuide={() => setGuide(true)} />
       {/* Phones: the disclaimer scrolls with the page instead of taking room in the fixed bar. */}
       <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-xs text-ink-3 sm:px-4 lg:hidden">
