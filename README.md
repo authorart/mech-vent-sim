@@ -39,8 +39,16 @@ corepack pnpm build
 
 - **Settings strip** (bottom): change knobs, then **Confirm**. Changes apply at the next breath. Mode buttons open a dialog to check the new mode's settings.
 - **Insp. pause / Exp. hold** measure P_plat and Total PEEP (PEEP_i).
-- **Freeze** stops the traces; move over them to read values.
-- **Instructor** panel: load a Patient Profile (starts deeply sedated on the Initial Settings), change sedation and patient values live, speed up blood gases, and **Copy case link** to share the exact case.
+- **Freeze** stops the traces; move over them to read values. **4th trace** adds esophageal pressure or the capnogram.
+- **Asynchrony guide** (top bar): one card per asynchrony type with a live example, how to recognize it, why it happens and how to fix it, and **Show me on the simulator**.
+- **Instructor** panel:
+  - load one of 10 Patient Profiles, change sedation, breathing pattern (natural/regular, agitation, reverse triggering, heartbeat ripple) and patient values live;
+  - **Targets** for the profile (optionally shown to learners) and **Apply recommended start**;
+  - **PEEP trial** table (dynamic compliance per PEEP);
+  - **Scenario events** (tension pneumothorax, cuff leak, fistula, bronchospasm, secretions, agitation, sedation wearing off) with their treatments;
+  - **Asynchrony** index, log and optional labels on the waveforms;
+  - **Copy case link** to share the exact case, including its scenario timeline.
+- Clinical behavior follows Hess & Kacmarek, *Essentials of Mechanical Ventilation*, 3rd ed. The values to review are listed in [docs/clinical-review-v2.md](docs/clinical-review-v2.md).
 
 ## Deploying
 
