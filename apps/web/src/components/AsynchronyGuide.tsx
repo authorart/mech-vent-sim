@@ -85,7 +85,7 @@ function ExampleChart({ trace, focus }: { trace: ExampleTrace; focus: Asynchrony
               opacity={own ? 0.8 : 0.45}
             />
             <text
-              x={l.x}
+              x={Math.min(W - labelWidth(l.text) / 2, Math.max(labelWidth(l.text) / 2, l.x))}
               y={y}
               fill={own ? "var(--ink)" : "var(--ink-3)"}
               fontSize="11"

@@ -308,10 +308,12 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
           ctx.stroke();
           ctx.setLineDash([]);
           ctx.globalAlpha = 1;
+          // Keep the label inside the plot; the tick stays at the event.
+          const lx = Math.min(w - v.width / 2, Math.max(AXIS_W + v.width / 2, v.x));
           ctx.fillStyle = colors.panel;
-          ctx.fillRect(v.x - v.width / 2, y, v.width, 15);
+          ctx.fillRect(lx - v.width / 2, y, v.width, 15);
           ctx.fillStyle = colors.cursor;
-          ctx.fillText(v.text, v.x, y + 2);
+          ctx.fillText(v.text, lx, y + 2);
         });
         ctx.font = `12px ${family}`;
         ctx.textBaseline = "middle";

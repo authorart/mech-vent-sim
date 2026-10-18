@@ -199,13 +199,13 @@ export const GUIDE: GuideEntry[] = [
     ],
     source: "Ch. 15 (flow asynchrony, fig. 15-6), ch. 7, ch. 31 (fig. 31-1)",
     example: {
-      profileId: "cardiogenicEdema",
-      settings: { ...INITIAL_SETTINGS, peakFlow: 40 / 60 },
+      profileId: "ards",
+      settings: { ...INITIAL_SETTINGS, peakFlow: 40 / 60, tidalVolume: 0.4 },
       sedation: "awake",
-      features: features(),
+      features: features({ agitation: "moderate" }),
       comparePassive: true,
       watch:
-        "VCV with peak flow 40 L/min in a breathless patient: each breath's pressure caves in mid-breath. Raise the flow to 80 L/min, or switch to PCV, and the pressure rise straightens out.",
+        "An awake, agitated ARDS patient on VCV with peak flow 40 L/min: the pressure stalls and sags mid-breath, below where a passive breath would be. Raise the flow to 80 L/min, or switch to PCV, and the pressure rise straightens out.",
     },
   },
   {
