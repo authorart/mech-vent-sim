@@ -76,10 +76,10 @@ export class EngineHost {
 
     switch (cmd.type) {
       case "loadProfile":
-        this.load(cmd.profileId, cmd.settings ?? INITIAL_SETTINGS, "deep");
+        this.load(cmd.profileId, cmd.settings ?? INITIAL_SETTINGS);
         break;
       case "reset":
-        this.load(this.profileId, INITIAL_SETTINGS, "deep");
+        this.load(this.profileId, INITIAL_SETTINGS);
         break;
       case "applySettings":
         s.sim.applySettings(cmd.settings);
@@ -128,11 +128,11 @@ export class EngineHost {
   private load(
     id: ProfileId,
     settings: VentSettings = INITIAL_SETTINGS,
-    sedation: SedationLevel = "deep",
+    sedation?: SedationLevel,
   ) {
     if (!(id in PROFILES)) throw new Error(`Unknown profile "${id}"`);
     this.profileId = id;
-    this.session = createProfileSession(id, { settings, sedation });
+    this.session = createProfileSession(id, { settings, ...(sedation && { sedation }) });
     this.paused = false;
     this.lastAlarmSilenced = false;
   }

@@ -5,6 +5,7 @@ import {
   diffFromProfile,
   encodeCase,
   INITIAL_SETTINGS,
+  PROFILES,
   type CaseState,
   type ProfileId,
 } from "@mech-vent/engine";
@@ -53,7 +54,7 @@ export function caseLink(c: CaseState): string {
 function isUntouchedDefault(c: CaseState, defaultProfile: ProfileId): boolean {
   return (
     c.profileId === defaultProfile &&
-    c.sedation === "deep" &&
+    c.sedation === PROFILES[defaultProfile].startSedation &&
     Object.keys(c.patch).length === 0 &&
     JSON.stringify(c.settings) === JSON.stringify(INITIAL_SETTINGS)
   );
@@ -64,7 +65,7 @@ export function loadCase(c: CaseState): void {
   const { send, setPatientSize } = useStore.getState();
   setPatientSize(c.sex, c.heightCm);
   send({ type: "loadProfile", profileId: c.profileId, settings: c.settings });
-  if (c.sedation !== "deep") send({ type: "setSedation", level: c.sedation });
+  send({ type: "setSedation", level: c.sedation });
   if (Object.keys(c.patch).length > 0) send({ type: "setProfileParam", patch: c.patch });
 }
 

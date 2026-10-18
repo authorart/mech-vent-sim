@@ -111,10 +111,13 @@ function SettingsEditor({
 function ModeDialog({
   mode,
   from,
+  noEffort,
   onClose,
 }: {
   mode: Mode | null;
   from: VentSettings;
+  /** The patient makes no effort (deep sedation or no drive). */
+  noEffort: boolean;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -141,6 +144,11 @@ function ModeDialog({
     >
       <h2 className="text-xl font-semibold">{fmt(m.changeMode, { mode })}</h2>
       <p className="mt-1 mb-4 max-w-prose text-sm text-ink-2">{m.modeDialogHint}</p>
+      {mode === "PSV" && noEffort && (
+        <p className="mb-4 max-w-prose rounded border border-pending/60 px-3 py-2 text-sm text-ink">
+          {m.psvNoEffort}
+        </p>
+      )}
       <SettingsEditor
         value={draft}
         base={null}
@@ -259,7 +267,17 @@ export function SettingsStrip() {
           {m.pendingNextBreath}
         </p>
       )}
-      <ModeDialog mode={modeTarget} from={current} onClose={() => setModeTarget(null)} />
+      {engine.apneaBackupActive && (
+        <p role="status" className="mt-2 max-w-prose text-sm text-ink-2">
+          {m.backupNote} {engine.sedation === "deep" && m.backupNoteDeep}
+        </p>
+      )}
+      <ModeDialog
+        mode={modeTarget}
+        from={current}
+        noEffort={engine.sedation === "deep" || engine.baseDrive.neuralRate === 0}
+        onClose={() => setModeTarget(null)}
+      />
     </section>
   );
 }

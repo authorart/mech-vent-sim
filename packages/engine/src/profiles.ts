@@ -1,3 +1,4 @@
+import type { SedationLevel } from "./drive";
 import type { GasParams } from "./gas";
 import type { Patient } from "./types";
 import type { CirculationParams } from "./vitals";
@@ -24,6 +25,7 @@ export interface PatientProfile {
   recommendedVtPerKg: number;
   /** Arterial pH at which the profile's drive applies unchanged (chemoreflex reference). */
   referencePh: number;
+  startSedation: SedationLevel;
 }
 
 /**
@@ -48,6 +50,14 @@ export interface ProfileValues {
   dbp: number;
   /** Presenting pH: the chemoreflex reference. */
   referencePh: number;
+  /** Small-airway narrowing on expiration (see Mechanics.airwayCollapse); collapseVolume in L. */
+  airwayCollapse?: number;
+  collapseVolume?: number;
+  /** Overdistension: elastic volume (L) where the P–V curve bends up, and its stiffness (cmH2O/L²). */
+  overdistensionVolume?: number;
+  overdistensionStiffness?: number;
+  /** Sedation level the profile opens with (default deep, R4-Q1). */
+  startSedation?: SedationLevel;
 }
 
 export const ANATOMIC_DEAD_SPACE = 0.125;
@@ -70,8 +80,18 @@ export function buildProfile(
     summary,
     recommendedVtPerKg,
     referencePh: v.referencePh,
+    startSedation: v.startSedation ?? "deep",
     patient: {
-      mechanics: { compliance: v.compliance / 1000, rInsp: v.rInsp, rExp: v.rExp },
+      mechanics: {
+        compliance: v.compliance / 1000,
+        rInsp: v.rInsp,
+        rExp: v.rExp,
+        ...(v.airwayCollapse && { airwayCollapse: v.airwayCollapse, collapseVolume: v.collapseVolume }),
+        ...(v.overdistensionStiffness && {
+          overdistensionVolume: v.overdistensionVolume,
+          overdistensionStiffness: v.overdistensionStiffness,
+        }),
+      },
       drive: { neuralRate: v.neuralRate, pmusMax: v.pmusMax, inspFraction: INSP_FRACTION },
     },
     gas: {
@@ -114,6 +134,8 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 80,
       sbp: 120,
       dbp: 75,
+      overdistensionVolume: 1.1,
+      overdistensionStiffness: 20,
       referencePh: 7.4,
     },
   ),
@@ -137,6 +159,8 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 105,
       sbp: 110,
       dbp: 65,
+      overdistensionVolume: 0.7,
+      overdistensionStiffness: 250,
       referencePh: 7.3,
     },
     6,
@@ -148,7 +172,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
     {
       compliance: 45,
       rInsp: 25,
-      rExp: 90,
+      rExp: 45,
       vco2: 220,
       vdvt: 0.45,
       shunt: 0.08,
@@ -161,6 +185,8 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 120,
       sbp: 135,
       dbp: 80,
+      airwayCollapse: 4,
+      collapseVolume: 1.1,
       referencePh: 7.3,
     },
   ),
@@ -171,7 +197,7 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
     {
       compliance: 80,
       rInsp: 20,
-      rExp: 75,
+      rExp: 45,
       vco2: 200,
       vdvt: 0.5,
       shunt: 0.08,
@@ -184,6 +210,8 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 100,
       sbp: 140,
       dbp: 80,
+      airwayCollapse: 5,
+      collapseVolume: 1.5,
       referencePh: 7.35,
     },
   ),
@@ -205,6 +233,9 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 125,
       sbp: 100,
       dbp: 55,
+      overdistensionVolume: 1.1,
+      overdistensionStiffness: 20,
+      startSedation: "awake",
       referencePh: 7.1,
     },
   ),
@@ -228,6 +259,8 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 110,
       sbp: 160,
       dbp: 95,
+      overdistensionVolume: 0.9,
+      overdistensionStiffness: 60,
       referencePh: 7.3,
     },
   ),
@@ -250,6 +283,8 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 125,
       sbp: 90,
       dbp: 60,
+      overdistensionVolume: 1.0,
+      overdistensionStiffness: 20,
       referencePh: 7.35,
     },
   ),
@@ -271,6 +306,8 @@ export const PROFILES: Record<ProfileId, PatientProfile> = {
       hr: 70,
       sbp: 115,
       dbp: 70,
+      overdistensionVolume: 1.1,
+      overdistensionStiffness: 20,
       referencePh: 7.4,
     },
   ),

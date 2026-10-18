@@ -16,25 +16,52 @@ export interface LungModel {
   volumeAtPressure(pressure: number): number;
 }
 
-/** One-compartment linear lung with direction-dependent resistance (ADR-0003). */
+/** Expiratory resistance never rises above this multiple of R_exp (keeps exhalation finite). */
+const MAX_COLLAPSE_FACTOR = 2;
+
+/**
+ * One-compartment lung with direction-dependent resistance (ADR-0003). Linear by default; a
+ * profile can add small-airway narrowing on expiration and stiffening at high volume.
+ */
 export class LinearLung implements LungModel {
   constructor(public mechanics: Mechanics) {}
 
+  /** Elastic recoil pressure (cmH2O) at elastic volume `v`. */
+  recoil(v: number): number {
+    const { compliance, overdistensionVolume: vod, overdistensionStiffness: k } = this.mechanics;
+    const over = vod !== undefined && k ? Math.max(0, v - vod) : 0;
+    return v / compliance + (k ?? 0) * over * over;
+  }
+
+  /** Expiratory resistance at elastic volume `v`. */
+  expiratoryResistance(v: number): number {
+    const { rExp, rInsp, airwayCollapse: n, collapseVolume: vc } = this.mechanics;
+    if (!n || !vc) return rExp;
+    const factor = Math.min(Math.pow(vc / Math.max(v, 1e-6), n), MAX_COLLAPSE_FACTOR);
+    return Math.max(rInsp, rExp * factor);
+  }
+
   alveolarPressure(volume: number, pmus: number): number {
-    return volume / this.mechanics.compliance - pmus;
+    return this.recoil(volume) - pmus;
   }
 
   flow(paw: number, volume: number, pmus: number): number {
     const drive = paw - this.alveolarPressure(volume, pmus);
-    return drive / (drive >= 0 ? this.mechanics.rInsp : this.mechanics.rExp);
+    return drive / (drive >= 0 ? this.mechanics.rInsp : this.expiratoryResistance(volume));
   }
 
   pressureForFlow(flow: number, volume: number, pmus: number): number {
-    const r = flow >= 0 ? this.mechanics.rInsp : this.mechanics.rExp;
+    const r = flow >= 0 ? this.mechanics.rInsp : this.expiratoryResistance(volume);
     return this.alveolarPressure(volume, pmus) + r * flow;
   }
 
   volumeAtPressure(pressure: number): number {
-    return pressure * this.mechanics.compliance;
+    const { compliance: c, overdistensionVolume: vod, overdistensionStiffness: k } = this.mechanics;
+    const linear = pressure * c;
+    if (vod === undefined || !k || linear <= vod) return linear;
+    // Solve k·x² + x/C = P − vod/C for x = V − vod ≥ 0.
+    const rhs = pressure - vod / c;
+    const x = (-1 / c + Math.sqrt(1 / (c * c) + 4 * k * rhs)) / (2 * k);
+    return vod + x;
   }
 }

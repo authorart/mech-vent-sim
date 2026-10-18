@@ -179,7 +179,7 @@ export interface ProfileSessionOptions {
   firstEffortAt?: number;
 }
 
-/** A Session for a Patient Profile, starting on the Initial Settings and deeply sedated. */
+/** A Session for a Patient Profile, starting on the Initial Settings at the profile's start sedation. */
 export function createProfileSession(id: ProfileId, opts: ProfileSessionOptions = {}): Session {
   const p = PROFILES[id];
   return new Session({
@@ -188,7 +188,7 @@ export function createProfileSession(id: ProfileId, opts: ProfileSessionOptions 
     gas: p.gas,
     circulation: p.circulation,
     referencePh: p.referencePh,
-    sedation: opts.sedation ?? "deep",
+    sedation: opts.sedation ?? p.startSedation,
     ...(opts.alarmLimits ? { alarmLimits: opts.alarmLimits } : {}),
     ...(opts.firstEffortAt !== undefined ? { firstEffortAt: opts.firstEffortAt } : {}),
   });

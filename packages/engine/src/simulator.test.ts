@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Simulator } from "./simulator";
+import { CIRCUIT_RESISTANCE, FLOW_RAMP_TIME, Simulator } from "./simulator";
 import { SAMPLE } from "./types";
 import type {
   BreathRecord,
@@ -78,11 +78,12 @@ describe("VCV: exact formulas (passive)", () => {
     expect(b.trigger).toBe("mandatory");
   });
 
-  it("decelerating flow doubles Ti and still delivers Vt", () => {
+  it("decelerating flow doubles Ti (plus the valve's opening ramp) and still delivers Vt", () => {
     const { breaths } = run(normal, vcv({ flowPattern: "decelerating" }), 30);
     const b = last(breaths);
     expect(b.vti).toBeCloseTo(0.5, 2);
-    expect(b.inspTime).toBeCloseTo(1.0, 2);
+    expect(b.inspTime).toBeGreaterThan(1.0);
+    expect(b.inspTime).toBeLessThan(1.0 + FLOW_RAMP_TIME + 0.001);
   });
 
   it("delivers the set rate", () => {
@@ -109,21 +110,21 @@ describe("PCV: exact formulas (passive)", () => {
 });
 
 describe("Expiration", () => {
-  it("expiratory flow decays with τ = R_exp·C", () => {
+  it("expiratory flow decays with τ = (R_exp + R_circuit)·C once the valve is open", () => {
     const sim = new Simulator({
       patient: { mechanics: normal, drive: passive },
       settings: vcv({ pauseTime: 0.5 }),
     });
     const { samples } = sim.advance(6);
-    const tau = 5 * 0.06;
-    const expStart = 0.5 + 0.5; // flow time + pause
+    const tau = (5 + CIRCUIT_RESISTANCE) * 0.06;
+    const expStart = 0.5 + FLOW_RAMP_TIME / 2 + 0.5; // flow time + pause
     const flowAt = (t: number) => {
       const i = Math.round(t * 100) - 1;
       return samples[i * SAMPLE.STRIDE + SAMPLE.FLOW]!;
     };
-    const q0 = -(0.5 / 0.06) / 5;
-    expect(flowAt(expStart + 0.01)).toBeCloseTo(q0 * Math.exp(-0.01 / tau), 2);
-    expect(flowAt(expStart + tau)).toBeCloseTo(q0 * Math.exp(-1), 2);
+    const t1 = expStart + 0.3;
+    expect(flowAt(t1 + tau) / flowAt(t1)).toBeCloseTo(Math.exp(-1), 2);
+    expect(flowAt(expStart + 0.01)).toBeGreaterThan(flowAt(expStart + 0.1)); // flow builds as the valve opens
   });
 });
 
@@ -135,11 +136,12 @@ describe("Intrinsic PEEP (comes out of the mechanics, ADR-0002/0003)", () => {
 
   it("matches the analytic steady state for obstructive mechanics", () => {
     const rate = 22;
-    const ti = 0.6;
+    const ti = 0.6 + FLOW_RAMP_TIME / 2;
     const te = 60 / rate - ti;
-    const k = Math.exp(-te / (55 * 0.045));
+    const k = Math.exp(-te / ((55 + CIRCUIT_RESISTANCE) * 0.045));
     const expected = (0.6 / 0.045) * (k / (1 - k));
-    expect(steadyPeepI(rate)).toBeCloseTo(expected, 1);
+    // The exhalation valve's opening (≈ 40 ms) costs a little expiratory time.
+    expect(steadyPeepI(rate)).toBeCloseTo(expected, 0);
     expect(steadyPeepI(rate)).toBeGreaterThan(8);
   });
 

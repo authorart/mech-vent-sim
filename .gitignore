@@ -10,3 +10,6 @@ coverage/
 .DS_Store
 npm-debug.log*
 pnpm-debug.log*
+
+# Reference books stay local (copyrighted, large)
+*.pdf

@@ -6,6 +6,12 @@ export type SedationLevel = "deep" | "light" | "awake";
 /** Fraction of the profile's Muscle Pressure available at each sedation level. */
 export const SEDATION_FACTOR: Record<SedationLevel, number> = { deep: 0, light: 0.5, awake: 1 };
 
+/**
+ * Wakefulness drive (V1.2, Hess & Kacmarek ch. 7/15): an awake patient keeps breathing even when
+ * alkalemic; only the chemical part of drive falls to zero. The multiplier never drops below this.
+ */
+export const WAKEFULNESS_FLOOR: Record<SedationLevel, number> = { deep: 0, light: 0.15, awake: 0.4 };
+
 /** Arterial pH at or above which chemical drive stops (apneic threshold). */
 export const APNEIC_PH = 7.5;
 const MAX_MULTIPLIER = 2;
@@ -22,8 +28,9 @@ export function chemoreflexMultiplier(ph: number | null, referencePh: number): n
 }
 
 /** The drive actually applied to the patient, given sedation and chemoreflex. */
-export function effectiveDrive(base: Drive, sedation: SedationLevel, multiplier: number): Drive {
+export function effectiveDrive(base: Drive, sedation: SedationLevel, chemo: number): Drive {
   const s = SEDATION_FACTOR[sedation];
+  const multiplier = Math.max(chemo, WAKEFULNESS_FLOOR[sedation]);
   if (s === 0 || multiplier === 0 || base.neuralRate === 0) {
     return { ...base, neuralRate: 0, pmusMax: 0 };
   }

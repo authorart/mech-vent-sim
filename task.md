@@ -3,7 +3,7 @@
 Source specs: [simulation-engine.md](./simulation-engine.md) (the Engine spec) · [Recommended-Simulator-Architecture.md](./Recommended-Simulator-Architecture.md) (stack)
 Domain language: [GLOSSARY.md](./GLOSSARY.md) · Decisions: [docs/adr/](./docs/adr/)
 
-**Status:** ✅ V1 prototype complete 2026-10-17. Live at https://mech-vent-sim.vercel.app. Next: the V2 backlog (needs a design round first). Repo: https://github.com/authorart/mech-vent-sim
+**Status:** ✅ V1 prototype complete 2026-10-17. Live at https://mech-vent-sim.vercel.app. V1 backed up 2026-10-18 (tag `v1.1.0`, branch `v1-backup`, zip `../mech-vent-v1.1.0-backup.zip`). **V1.2 fixes done** (see below). Next: **V2** (Round 6 agreed), starting with M9. Repo: https://github.com/authorart/mech-vent-sim
 
 ---
 
@@ -65,8 +65,8 @@ Domain language: [GLOSSARY.md](./GLOSSARY.md) · Decisions: [docs/adr/](./docs/a
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Normal | 60 | 5 / 5 | 200 | 0.30 | 5% | 24 | 14 / 5 |
 | ARDS | 20 | 8 / 8 | 220 | 0.55 | 45% | 22 | 28 / 8 |
-| Status asthmaticus | 45 | 25 / **90** | 220 | 0.45 | 8% | 24 | 24 / 10 |
-| COPD exacerbation | 80 | 20 / **75** | 200 | 0.50 | 8% | 32 | 20 / 8 |
+| Status asthmaticus | 45 | 25 / **90** → V1.2: 45 at 1.1 L, rising as the lung empties | 220 | 0.45 | 8% | 24 | 24 / 10 |
+| COPD exacerbation | 80 | 20 / **75** → V1.2: 45 at 1.5 L, rising as the lung empties | 200 | 0.50 | 8% | 32 | 20 / 8 |
 | Metabolic acidosis | 60 | 4 / 4 | 280 | 0.30 | 5% | 8 | 32 / 20 |
 | Cardiogenic edema | 30 | 11 / 11 | 220 | 0.35 | 25% | 22 | 26 / 10 |
 | Massive PE | 52 | 4.5 / 4.5 | 220 | 0.65 | 10% | 22 | 24 / 8 |
@@ -129,8 +129,100 @@ Each milestone ends with its tests passing and an update here.
   - [x] Clinical review: you accepted all flagged values as-is for the first prototype (2026-10-17). They stay flagged ⚠ above for a later review
   - [x] Deployed to Vercel (project `mech-vent-sim`, root `apps/web`, Node 24): **https://mech-vent-sim.vercel.app**. Checked live in a headless browser
 
-### V2 backlog
+---
 
-Scenario Events + Scenario timeline · tension pneumothorax (and circulation response) · curved compliance / two compartments · seeded random profile values · accounts and saved Scenarios · Thai localization
+## V1.2: waveform fixes you asked for (2026-10-18)
+
+- [x] **Backup first**: tag `v1.1.0` and branch `v1-backup` pushed to GitHub; zip snapshot `../mech-vent-v1.1.0-backup.zip`
+- [x] **PSV / Esens did nothing**: the Esens logic was right, but patients start deeply sedated, so PSV fell into Apnea Backup (time-cycled PCV) and stayed there. The backup's 15 cmH2O also hyperventilated normal lungs to pH 7.68, which switched off all drive. Fixes: Apnea Backup now hands back to PSV after 2 patient-triggered breaths; a **Wakefulness Drive** floor keeps awake (×0.4) and lightly sedated (×0.15) patients breathing when alkalemic (book ch. 7, 15); the mode dialog warns when choosing PSV for a patient with no effort; a note under the settings explains Apnea Backup while it runs. Esens now visibly moves Ti (5% → 1.3 s, 70% → 0.2 s on awake normal lungs)
+- [x] **Metabolic acidosis didn't show high demand**: the profile opened deeply sedated (no effort at all). It now opens **awake** (its lesson is the drive). On PSV/PCV the patient pulls peak flows near 120 L/min and Vt about 900 mL (area under the flow curve). On VCV the flow is set by the ventilator, so the demand shows the book's way instead: scooped pressure (Flow Starvation) and Double Triggers
+- [x] **No scooped expiratory flow in asthma/COPD**: expiratory resistance now rises as the lung empties (small-airway narrowing, ADR-0003 amendment): early expiratory peak, then a concave, slow tail. COPD added PEEP is partly absorbed, as in the book. Reviewed numbers changed: asthma R_exp 45 at 1.1 L (n = 4), COPD R_exp 45 at 1.5 L (n = 5); PEEP_i stays in the spec's 8–18 range; lowering RR still halves asthma PEEP_i
+- [x] **Polygon loops**: the loops were drawn at full resolution; the straight lines came from ideal physics. Added: exhalation valve that opens over ~40 ms and a 2 cmH2O/(L/s) expiratory circuit (pressure eases down to PEEP), a 50 ms VCV flow-valve ramp (Vt stays exact), and overdistension (the P–V curve bends right, "beak", when volume passes a profile's upper limit; strongest in ARDS). The S-shaped lower part with recruitment comes in M11
+- [x] Found while checking: (a) between breaths the flow trigger let a patient draw unlimited gas at PEEP (volume trace drifted to −600 mL). Now a **Bias Flow** of 5 L/min (≥ trigger + 2) is all the circuit supplies; harder pulls drop airway pressure. (b) COPD blood gases started falsely high (PaCO2 ~100) because the first exhaled volumes are small while air trapping builds; gas priming now uses inspired volume. (c) Loading a profile from the Instructor Panel forced deep sedation; it now uses the profile's start sedation
+- [x] 85 engine tests (10 new in `realism.test.ts`), typecheck and lint clean, checked in a headless browser (COPD/asthma loops, metabolic acidosis VCV and PSV, PSV warning)
+
+---
+
+## V2: realistic waveforms, asynchrony and disease behavior (planned 2026-10-18, not started)
+
+**Source:** Hess DR, Kacmarek RM. *Essentials of Mechanical Ventilation*, 3rd ed. (McGraw-Hill, 2014). Chapters used: 7 (pressure vs volume), 9 (flow waveforms, I:E), 14 (initial settings), 15 (patient–ventilator asynchrony), 17 (ARDS), 18 (obstructive disease), 22 (neuromuscular), 23 (cardiac failure), 25 (bronchopleural fistula), 26 (drug overdose), 28 (capnography), 30–31 (basic and advanced mechanics). The PDF stays on your machine and is kept out of git (`*.pdf` in `.gitignore`); this plan only summarizes it.
+
+### What V1 already does, measured
+
+A probe run (awake patients, Initial Settings, 60 s) showed the physics already produces some asynchrony on its own:
+
+| Profile | Mode | Result |
+| --- | --- | --- |
+| COPD | VCV | 20 neural efforts/min, **0 triggered** (all Ineffective Triggers from PEEP_i) |
+| Metabolic acidosis | VCV | 32 efforts → 64 breaths: **31 Double Triggers** (stacked breaths) |
+| Asthma | VCV | Every breath ends at the 40 cmH2O limit (as decided in R4-Q4) |
+| All | VCV, PSV | Flow Starvation "scooping" appears when effort is strong |
+
+**The main realism gap:** every breath is identical (same Ti to the millisecond, same effort). Real patients vary. Several asynchronies and artifacts in the book are also missing completely.
+
+### Gap list: book vs V1
+
+| Topic (chapter) | What the book describes | V1 today | V2 work |
+| --- | --- | --- | --- |
+| Breath variability | Real effort varies breath to breath; sighs occur | Perfectly periodic P_mus | Seeded variability of neural rate, amplitude and Ti; occasional sighs |
+| Trigger asynchrony (15) | Ineffective efforts from PEEP_i; autotriggering from cardiac oscillations (4–6 L/min at the airway; a 2 L/min flow trigger fires, 8 L/min stops it) and from leaks; reverse triggering (effort entrained by the ventilator's breath, can stack breaths) | Ineffective triggers ✅. No autotriggering, no reverse triggering | Cardiogenic oscillation signal; leak; entrainment model for reverse triggering |
+| Flow asynchrony (15, 31) | Fixed VCV flow below demand: pressure trace scoops and varies breath to breath | Scooping ✅ (constant because effort is constant) | Comes free with variability; add tests |
+| Cycle asynchrony (7, 9, 15) | Premature cycling → double trigger. Delayed cycling (COPD in PSV: flow decays slowly, Esens reached late) → patient actively exhales → pressure bump at end of inspiration and PSV pressure-cycles | Double trigger ✅. No expiratory muscles, no PSV pressure-cycle rule (only the 40 limit and a 3 s time limit) | Expiratory muscle activity; PSV secondary cycle on pressure (target + a few cmH2O) |
+| Mode asynchrony (15) | SIMV: same effort on mandatory and spontaneous breaths. PSV periodic breathing (hyperventilation → apnea → alarm → arousal) | No SIMV. Apnea Backup latches | Later (backlog) |
+| Rise time (7, 9) | Too fast → pressure overshoot at the start; too slow → concave rise and flow starvation | Ideal linear ramp to target, no overshoot | Servo-like pressure controller with finite response |
+| Inspiratory pause (9, 30) | Pressure drops from peak to P1 quickly, then slowly to P2 (gas redistribution between fast and slow units, pendelluft) | Perfectly flat plateau | Simple viscoelastic element (or two compartments) |
+| COPD vs asthma PEEP (15, 18) | COPD has **expiratory flow limitation**: external PEEP up to ~80% of PEEP_i counterbalances it, so triggering improves without raising total PEEP. Asthma usually has no flow limitation: added PEEP adds to total PEEP | V1.2: volume-dependent R_exp partly absorbs added PEEP in COPD | Full waterfall (critical closing pressure) model for COPD in M11 |
+| ARDS mechanics (17, 31) | Stress index (upward concavity = overdistension, downward = tidal recruitment); best-compliance decremental PEEP trial; inflation/deflation hysteresis after a recruitment maneuver; stiff chest wall → transpulmonary pressure via esophageal pressure | Fixed compliance; recruitment changes shunt only | Curved P–V with recruitment that changes compliance and has hysteresis; chest-wall split and esophageal pressure |
+| Pneumothorax (25) | VCV: rising peak pressure. PCV: falling Vt. HR and BP rise first, then collapse | Not modeled | Scenario Event |
+| Bronchopleural fistula / cuff leak (25, 31) | Vte < Vti; volume trace doesn't return to zero; PSV fails to cycle (flow never falls to Esens); CO2 leaves through the fistula | Not modeled | Scenario Event |
+| Cardiac failure (23) | Positive pressure and PEEP 5–10 *help* the failing LV; removing support (SBT) can bring edema back | BP falls with P_mean in every profile | Profile-specific hemodynamic response; pulse pressure variation |
+| Neuromuscular disease (22) | Normal lungs, weak effort, often wants larger Vt; hypoxemia resolves once ventilated | No profile | New profile |
+| Capnogram (28) | Phases I–III; phase III steeper in obstruction; wide PaCO2–EtCO2 gap in dead-space disease | EtCO2 number and PaCO2–EtCO2 gap ✅, no waveform | Optional CO2 waveform |
+| Disease management (14, 17, 18, 22, 23, 26) | Per-disease starting settings and targets (see table below) | Same generic Initial Settings for every profile (R3-Q2) | Targets card per profile, deterministic checks against current settings |
+
+#### Disease targets from the book (to drive the Targets card and tests)
+
+| Profile | Vt (mL/kg PBW) | RR | Ti (s) | PEEP | Pressure limits | Gas targets |
+| --- | --- | --- | --- | --- | --- | --- |
+| ARDS | 6 (4–8) | 20–35, avoid PEEP_i | 0.5–0.8 | 10–20 (PEEP/FiO2 table, or best compliance + 2) | P_plat ≤ 30 | SpO2 88–95, PaO2 55–80, pH 7.20–7.40 (permissive hypercapnia) |
+| COPD | 6–8 | 8–15 | 0.6–1.0 | 5, or up to ~80% of PEEP_i to help triggering; rarely > 10 | P_plat < 30 | PaCO2 back to the patient's baseline, pH > 7.30; FiO2 rarely > 0.5 |
+| Status asthmaticus | 4–6 | 8–20 | 1–1.5 (short enough to avoid PEEP_i) | Controversial; only if total PEEP doesn't rise | Peak 60–70 acceptable if P_plat < 30 | pH ≥ 7.20 (7.10 tolerated), SpO2 88–95 |
+| Cardiogenic edema | 6–8 | > 15 | ≤ 1 | 5–10 (unloads the LV) | P_plat < 30 | FiO2 1.0 first, then titrate |
+| Neuromuscular weakness | 8 to < 10 if lung volumes normal | ≥ 15 | > 1 | ~5 | P_plat < 30 | Normal PaCO2 (add dead space if large Vt makes it low) |
+| Drug overdose / central apnea | 6–8 | 15–20 | ≤ 1 | 5 | P_plat < 30 | Oxygenation rarely the problem unless aspiration |
+
+### Round 6 ✅ (2026-10-18, "Agree all")
+
+| # | Question | My recommendation |
+| --- | --- | --- |
+| R6-Q1 | Word for the umbrella concept: "asynchrony" or "dyssynchrony"? | **Asynchrony** (the book's term), with types Trigger, Flow, Cycle and Mode Asynchrony. "Dyssynchrony" listed as a word to avoid, so the UI uses one word |
+| R6-Q2 | Should asynchronies only *emerge* from physics and settings, or can the instructor *inject* them? | **Emerge** for trigger, flow and cycle asynchrony (fixing them is the lesson). Artifacts that need a cause (cardiac oscillations, leaks, reverse-trigger entrainment, agitation) become patient features or Scenario Events the instructor turns on |
+| R6-Q3 | Active exhalation: let P_mus go negative, or add a separate expiratory muscle pressure? | **Separate Expiratory Muscle Pressure (≥ 0)**, amending ADR-0002, so the sign rule for P_mus stays intact |
+| R6-Q4 | Breath-to-breath variability on by default? | **On by default**, seeded by the case so a shared link replays exactly. Instructor toggle "Regular breathing" for clean demonstrations |
+| R6-Q5 | COPD expiratory flow limitation (PEEP counterbalances PEEP_i)? | **Yes, COPD only.** Asthma stays linear (added PEEP adds to total PEEP), matching the book |
+| R6-Q6 | Lung model upgrade: curved compliance or two compartments first? | **Curved P–V + recruitment-dependent compliance with hysteresis, plus a viscoelastic element** for the P1→P2 pause decay. Two compartments later |
+| R6-Q7 | Esophageal pressure and chest wall split? | **Yes.** Chest wall compliance per profile, optional esophageal/transpulmonary trace, and a stiff-chest-wall ARDS variant (obesity / abdominal pressure) |
+| R6-Q8 | Hemodynamics per profile? | **Yes.** A per-profile preload sensitivity: PEEP helps BP in cardiogenic edema and hurts in the others; show pulse pressure variation |
+| R6-Q9 | New profiles in V2? | **Neuromuscular weakness** (Guillain–Barré type) and **ARDS with stiff chest wall**. Pneumothorax, fistula/cuff leak, bronchospasm, secretions and agitation become Scenario Events |
+| R6-Q10 | Who sees the asynchrony labels? | The **Instructor Panel** gets a live asynchrony log and an Asynchrony Index (% of breaths). Learners see only waveforms unless the instructor turns on "Show labels" |
+| R6-Q11 | Disease targets card (table above): visible to learners? | **Instructor reveals it.** Hidden by default so learners set the ventilator themselves first |
+| R6-Q12 | Starting settings per profile instead of the generic Initial Settings (R3-Q2)? | **Keep the generic start** (fixing it is the exercise) and add an Instructor button "Apply recommended start" from the targets table |
+| R6-Q13 | (Your request) A teaching menu for asynchrony | **Yes**: a new **Asynchrony Guide** menu. One card per type (ineffective trigger, auto-trigger, reverse trigger, double trigger, flow starvation, premature and delayed cycling, PSV periodic breathing): a small example waveform, how to recognize it on the scalars and loops, why it happens, and the book's fixes. "Show me" loads a live example on the simulator. Built in M12 |
+
+### V2 milestones (proposed; final order after Round 6)
+
+Each milestone ends with tests passing, the V1 profile signatures re-checked, and an update here.
+
+- [ ] **M9 Patient effort realism**: seeded variability (neural rate, amplitude, Ti) and sighs · Expiratory Muscle Pressure (active exhalation when the ventilator's inspiration outlasts the neural one) · agitation/pain drive · reverse-trigger entrainment. Tests: each asynchrony type reproduced by a known setting and removed by the book's fix (e.g. raise Esens fixes delayed cycling in COPD PSV; raise VCV flow or switch to PCV fixes flow starvation; lengthen Ti or use decelerating flow fixes double triggering)
+- [ ] **M10 Ventilator realism**: servo-like pressure rise (overshoot when too fast, concave when too slow) · PSV secondary cycle on pressure · cardiogenic oscillations in flow and pressure (autotriggering with a 2 L/min flow trigger, stops at ~8 L/min) · small signal noise
+- [ ] **M11 Lung realism**: COPD flow limitation · curved P–V with recruitment-dependent compliance and hysteresis (stress index shape, best-compliance PEEP) · viscoelastic pause decay (peak → P1 → P2) · chest wall split and esophageal pressure
+- [ ] **M12 Asynchrony detection and Asynchrony Guide**: Engine-truth classifier (ineffective, double, auto, reverse trigger; premature/delayed cycle; flow starvation) · Asynchrony Index · Instructor log · optional labels on the waveforms · **Asynchrony Guide menu** (R6-Q13): short notes per type on recognition, mechanism and fixes, with an example waveform and a "Show me" live example
+- [ ] **M13 Scenario Events**: timeline in the Instructor Panel · tension pneumothorax (VCV peak ↑, PCV Vt ↓, HR/BP up then collapse) · fistula / cuff leak (Vte < Vti, volume not returning to zero, PSV not cycling, autotriggering) · bronchospasm · secretions (sawtooth flow) · agitation · sedation wearing off. Included in shared case links
+- [ ] **M14 Disease behavior**: Neuromuscular and stiff-chest-wall ARDS profiles · per-profile hemodynamics and pulse pressure variation · Targets card and "Apply recommended start" · stress index and dynamic compliance trend for a decremental PEEP trial
+- [ ] **M15 Displays and ship**: optional 4th trace (esophageal/transpulmonary pressure or capnogram) · loops and numbers for the new values · phone and desktop check · your clinical review of the new numbers · deploy
+
+### Later (not in V2)
+
+SIMV and adaptive modes (mode asynchrony, PRVC/volume support) · PSV periodic breathing with sleep · two-compartment lung · seeded random profile values · accounts and saved Scenarios · Thai localization
 
 _Deferred by you (R5-3): the LLM layer (Scenario generation, instructor feedback, debrief). ADR-0001 still applies if it returns._

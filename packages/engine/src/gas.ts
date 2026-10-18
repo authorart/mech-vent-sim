@@ -83,7 +83,7 @@ export interface GasInputs {
 
 /** Steady-state targets and the dynamic arterial state. */
 export class GasExchange {
-  private alveolarVolumes: { start: number; t: number; v: number }[] = [];
+  private alveolarVolumes: { start: number; t: number; v: number; vInspired: number }[] = [];
   private lastBreathEnd = -Infinity;
   private lastTidalVolume = 0;
   private paco2: number | null = null;
@@ -102,8 +102,14 @@ export class GasExchange {
 
   onBreath(b: BreathRecord): void {
     const p = this.params;
-    const alveolar = Math.max(0, b.vte - p.anatomicDeadSpace) * (1 - p.alveolarDeadSpaceFraction);
-    this.alveolarVolumes.push({ start: b.startTime, t: b.endTime, v: alveolar });
+    const alveolar = (vt: number) =>
+      Math.max(0, vt - p.anatomicDeadSpace) * (1 - p.alveolarDeadSpaceFraction);
+    this.alveolarVolumes.push({
+      start: b.startTime,
+      t: b.endTime,
+      v: alveolar(b.vte),
+      vInspired: alveolar(b.vti),
+    });
     this.lastBreathEnd = b.endTime;
     this.lastTidalVolume = b.vte;
   }
@@ -113,7 +119,7 @@ export class GasExchange {
    * from the first counted breath's start to the last one's end. If breathing stops, the span
    * stretches to now so V_A falls toward zero.
    */
-  alveolarVentilation(t: number): number {
+  alveolarVentilation(t: number, inspired = false): number {
     this.alveolarVolumes = this.alveolarVolumes.filter((x) => x.t > t - VA_WINDOW);
     const first = this.alveolarVolumes[0];
     const last = this.alveolarVolumes.at(-1);
@@ -122,7 +128,8 @@ export class GasExchange {
     const period = span / this.alveolarVolumes.length;
     if (t - last.t > 2 * period) span = t - first.start;
     if (span <= 0) return 0;
-    return (this.alveolarVolumes.reduce((s, x) => s + x.v, 0) * 60) / span;
+    const sum = this.alveolarVolumes.reduce((s, x) => s + (inspired ? x.vInspired : x.v), 0);
+    return (sum * 60) / span;
   }
 
   shuntFraction(inputs: GasInputs): number {
@@ -133,8 +140,8 @@ export class GasExchange {
     return Math.min(0.95, trueShunt + admixture);
   }
 
-  targets(t: number, inputs: GasInputs): { paco2: number; pao2: number } {
-    const va = this.alveolarVentilation(t);
+  targets(t: number, inputs: GasInputs, inspired = false): { paco2: number; pao2: number } {
+    const va = this.alveolarVentilation(t, inspired);
     const paco2 = va > 0.05 ? Math.min(200, (0.863 * this.params.vco2) / va) : 200;
     return { paco2, pao2: this.pao2Target(paco2, inputs) };
   }
@@ -149,9 +156,13 @@ export class GasExchange {
     return po2FromContent(ca, hb);
   }
 
-  /** Snap to steady state (used once the initial breaths have filled the window). */
+  /**
+   * Snap to steady state (used once the initial breaths have filled the window). Uses inspired
+   * volumes: at steady state Vte = Vti, but while air trapping builds up the first exhaled
+   * volumes are smaller and would overstate PaCO2.
+   */
   prime(t: number, inputs: GasInputs): void {
-    const tg = this.targets(t, inputs);
+    const tg = this.targets(t, inputs, true);
     this.paco2 = tg.paco2;
     this.pao2 = tg.pao2;
     this.latest = this.snapshot(t, inputs);

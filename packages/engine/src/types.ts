@@ -10,8 +10,20 @@ export interface Mechanics {
   compliance: number;
   /** Inspiratory Resistance R_insp (cmH2O/(L/s)). */
   rInsp: number;
-  /** Expiratory Resistance R_exp (cmH2O/(L/s)). */
+  /** Expiratory Resistance R_exp (cmH2O/(L/s)), at `collapseVolume` when that is set. */
   rExp: number;
+  /**
+   * Small-airway narrowing (ADR-0003, V1.2): R_exp × (collapseVolume / V)^airwayCollapse, never
+   * below R_insp. Expiratory flow peaks early, then falls away: the "scooped" obstructive pattern.
+   * 0 or unset = constant R_exp.
+   */
+  airwayCollapse?: number;
+  /** Elastic volume (L) at which the expiratory resistance equals R_exp. */
+  collapseVolume?: number;
+  /** Elastic volume (L) above which the respiratory system stiffens (overdistension). */
+  overdistensionVolume?: number;
+  /** Extra recoil k × (V − overdistensionVolume)² above that volume (cmH2O/L²). 0 or unset = linear. */
+  overdistensionStiffness?: number;
 }
 
 /** Respiratory drive: produces Muscle Pressure on its own neural clock. */

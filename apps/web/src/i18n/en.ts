@@ -40,6 +40,11 @@ export const en = {
   confirm: "Confirm",
   cancel: "Cancel",
   pendingNextBreath: "New settings apply at the next breath",
+  backupNote:
+    "Apnea Backup is breathing for the patient in PCV, so pressure support and Esens are not in use. PSV returns after 2 patient-triggered breaths.",
+  backupNoteDeep: "The patient is deeply sedated and makes no effort: lighten sedation in the Instructor Panel.",
+  psvNoEffort:
+    "This patient is deeply sedated and makes no breathing effort. PSV only supports breaths the patient starts, so after the apnea time the ventilator will switch to Apnea Backup (PCV). Lighten sedation in the Instructor Panel to see PSV cycling.",
   changeMode: "Change mode to {mode}",
   modeDialogHint:
     "PEEP, FiO₂, trigger and pressure limit carry over. Check the rest before confirming.",

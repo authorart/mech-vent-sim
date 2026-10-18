@@ -19,10 +19,30 @@ export const TRIGGER_DELAY = 0.08;
 export const TRIGGER_LOCKOUT = 0.05;
 /** Safety cap on pressure-support inspiration (s). */
 export const MAX_PSV_INSP_TIME = 3;
+/** Patient-triggered breaths during Apnea Backup that hand control back to PSV. */
+export const BACKUP_EXIT_BREATHS = 2;
 /** Duration of an Inspiratory Pause or Expiratory Hold maneuver (s). */
 export const HOLD_TIME = 0.5;
 /** Muscle Pressure above this during a pause or hold makes the measurement unreliable (cmH2O). */
 export const MANEUVER_EFFORT_LIMIT = 0.5;
+/**
+ * Resistance of the expiratory limb and exhalation valve (cmH2O/(L/s)). Airway pressure sits a
+ * little above PEEP while gas leaves, so the pressure trace and P–V loop round off instead of
+ * dropping straight to PEEP; a patient drawing on the bias flow pulls it slightly below.
+ */
+export const CIRCUIT_RESISTANCE = 2;
+/**
+ * Bias flow through the circuit between breaths when flow triggering (L/s): 5 L/min, and always
+ * 2 L/min above the trigger threshold. A patient pulling harder than this drops airway pressure.
+ */
+export function biasFlow(triggerThreshold: number): number {
+  return Math.max(5 / 60, triggerThreshold + 2 / 60);
+}
+/** Exhalation valve opening: extra resistance R0·e^(−t/τ) at the start of expiration (rounds the corner). */
+export const VALVE_OPENING_RESISTANCE = 40;
+export const VALVE_OPENING_TIME = 0.04;
+/** Time the VCV flow valve takes to reach the set flow (s). Ti is lengthened so Vt stays exact. */
+export const FLOW_RAMP_TIME = 0.05;
 
 export interface AdvanceResult {
   /** Interleaved Samples; see `SAMPLE` for the layout. */
@@ -37,7 +57,7 @@ type Control =
   | { kind: "flow"; q: (t: number) => number }
   | { kind: "pressure"; paw: (t: number) => number }
   | { kind: "closed" }
-  | { kind: "expiratory"; peep: number; oneWay: boolean };
+  | { kind: "expiratory"; peep: number; oneWay: boolean; /** L/s, flow triggering only */ bias: number };
 
 /** The breath currently being delivered, resolved from settings at breath start. */
 type ActiveBreath =
@@ -86,6 +106,8 @@ export class Simulator {
   private settings: VentSettings;
   private pending: VentSettings | null = null;
   private backupActive = false;
+  /** Patient-triggered breaths since Apnea Backup started. */
+  private backupPatientRun = 0;
 
   private step = 0;
   private stepCarry = 0;
@@ -164,6 +186,7 @@ export class Simulator {
   endApneaBackup(): void {
     if (!this.backupActive) return;
     this.backupActive = false;
+    this.backupPatientRun = 0;
     this.lastBreathStart = this.time;
     this.outEvents.push({ type: "apneaBackupEnded", t: this.time });
   }
@@ -248,8 +271,9 @@ export class Simulator {
       case "closed":
         return 0;
       case "expiratory": {
-        const q = this.lung.flow(control.peep, v, pmus);
-        return control.oneWay && q > 0 ? 0 : q;
+        const q = this.expiratoryFlow(control.peep, v, pmus, t);
+        if (q <= 0) return q;
+        return control.oneWay ? 0 : Math.min(q, control.bias);
       }
     }
   }
@@ -264,8 +288,24 @@ export class Simulator {
         return this.lung.alveolarPressure(v, pmus);
       case "expiratory":
         // A one-way expiratory valve with no inflow source: airway pressure follows the alveoli.
-        return flow === 0 && control.oneWay ? this.lung.alveolarPressure(v, pmus) : control.peep;
+        if (flow === 0 && control.oneWay) return this.lung.alveolarPressure(v, pmus);
+        // Demand beyond the bias flow: the circuit can't keep up and airway pressure falls.
+        if (flow > 0 && flow >= control.bias - 1e-12) return this.lung.pressureForFlow(flow, v, pmus);
+        return control.peep - this.circuitResistance(t) * flow;
     }
+  }
+
+  /** Expiratory circuit plus the exhalation valve, which is still opening early in expiration. */
+  private circuitResistance(t: number): number {
+    const opening = this.phase === "expiration" && this.breath ? t - this.phaseStart : Infinity;
+    return CIRCUIT_RESISTANCE + VALVE_OPENING_RESISTANCE * Math.exp(-opening / VALVE_OPENING_TIME);
+  }
+
+  /** Flow through the patient and the expiratory circuit in series, with the valve held at PEEP. */
+  private expiratoryFlow(peep: number, v: number, pmus: number, t: number): number {
+    const drive = peep - this.lung.alveolarPressure(v, pmus);
+    const r = drive >= 0 ? this.lung.mechanics.rInsp : this.lung.expiratoryResistance(v);
+    return drive / (r + this.circuitResistance(t));
   }
 
   private control(): Control {
@@ -274,16 +314,22 @@ export class Simulator {
     if (this.phase === "pause" || this.phase === "expiratoryHold") return { kind: "closed" };
     if (this.phase === "expiration" || !b) {
       // Flow triggering assumes bias flow, so the patient can draw gas at PEEP.
-      return { kind: "expiratory", peep, oneWay: this.settings.trigger.type === "pressure" };
+      const trig = this.settings.trigger;
+      return trig.type === "flow"
+        ? { kind: "expiratory", peep, oneWay: false, bias: biasFlow(trig.threshold) }
+        : { kind: "expiratory", peep, oneWay: true, bias: 0 };
     }
 
     const start = this.phaseStart;
     switch (b.kind) {
       case "VCV": {
         const { peakFlow, decel, tiFlow } = b;
+        const ramp = (t: number) => Math.min(1, (t - start) / FLOW_RAMP_TIME);
         return {
           kind: "flow",
-          q: decel ? (t) => peakFlow * Math.max(0, 1 - (t - start) / tiFlow) : () => peakFlow,
+          q: decel
+            ? (t) => peakFlow * ramp(t) * Math.max(0, 1 - (t - start) / tiFlow)
+            : (t) => peakFlow * ramp(t),
         };
       }
       case "PCV":
@@ -449,6 +495,13 @@ export class Simulator {
       this.pending = null;
       this.outEvents.push({ type: "settingsApplied", t });
     }
+    if (this.backupActive) {
+      if (trigger === "patient") this.backupPatientRun++;
+      // The patient is breathing again: return to PSV, as ICU ventilators do.
+      if (this.backupPatientRun >= BACKUP_EXIT_BREATHS && this.settings.mode === "PSV") {
+        this.endApneaBackup();
+      }
+    }
     this.breath = this.resolveBreath(this.settings);
     this.phase = "inspiration";
     this.phaseStart = t;
@@ -483,8 +536,13 @@ export class Simulator {
     switch (s.mode) {
       case "VCV": {
         const decel = s.flowPattern === "decelerating";
-        // A linear ramp to zero delivers half the volume of a square wave at the same peak flow.
-        const tiFlow = (decel ? 2 : 1) * (s.tidalVolume / s.peakFlow);
+        const r = FLOW_RAMP_TIME;
+        const v = s.tidalVolume / s.peakFlow;
+        // Flow time that delivers exactly Vt after the opening ramp. Square: Vt/peak + r/2.
+        // Decelerating (ramp up over r, then linear to zero at T): T/2 − r/2 + r²/(6T) = Vt/peak.
+        const tiFlow = decel
+          ? (r + 2 * v + Math.sqrt((r + 2 * v) ** 2 - (4 * r * r) / 3)) / 2
+          : v + r / 2;
         return { kind: "VCV", tiFlow, pause: s.pauseTime, peakFlow: s.peakFlow, decel };
       }
       case "PCV":

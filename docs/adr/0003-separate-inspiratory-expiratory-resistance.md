@@ -1,3 +1,7 @@
 # Separate inspiratory and expiratory resistance
 
 `simulation-engine.md` defines one R_aw. The lung model instead has **R_insp** and **R_exp**. With a single linear resistance, the obstructive profiles can't reach the spec's own PEEP_i range (8–18 cmH2O) at realistic settings. A steady-state check gave about 2.4 cmH2O for asthma. Real obstruction is worse during expiration (dynamic airway collapse). Making R_exp about 2.2× R_insp reproduces both the peak–plateau gap and the auto-PEEP while keeping the model linear and one-compartment. The spec's tau ranges are understood as using R_insp. Curved, flow-limited resistance was considered and deferred because it adds complexity.
+
+## Amendment (V1.2, 2026-10-18): volume-dependent expiratory resistance
+
+A constant R_exp empties the lung along a straight flow–volume line, so the obstructive profiles lacked the early peak and "scooped" expiratory limb that teachers point to. Obstructive profiles now set `airwayCollapse` and `collapseVolume`: R_exp is the resistance at that volume and rises as the lung empties (R_exp × (V_c/V)^n, never below R_insp and at most 2× R_exp). The model stays one-compartment. Side effect, consistent with Hess & Kacmarek ch. 15/18: in COPD, added PEEP raises lung volume, lowers R_exp and is partly absorbed (Total PEEP rises less than PEEP). Asthma uses a gentler curve so that lowering the rate still halves PEEP_i. A true waterfall (critical closing pressure) model is still deferred to V2 M11.

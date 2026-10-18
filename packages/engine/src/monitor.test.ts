@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AlarmEvent } from "./alarms";
 import type { BreathMetrics } from "./monitor";
 import { Session } from "./session";
+import { CIRCUIT_RESISTANCE, FLOW_RAMP_TIME } from "./simulator";
 import type { Drive, Mechanics, PsvSettings, VcvSettings, VentSettings } from "./types";
 
 const passive: Drive = { neuralRate: 0, pmusMax: 0, inspFraction: 0.35 };
@@ -69,7 +70,7 @@ describe("Maneuvers", () => {
     const { events } = s.advance(5);
     const hold = events.find((e) => e.type === "totalPeepMeasured");
     const te = 60 / 22 - 0.6;
-    const k = Math.exp(-te / (55 * 0.045));
+    const k = Math.exp(-te / ((55 + CIRCUIT_RESISTANCE) * 0.045));
     const expected = (0.6 / 0.045) * (k / (1 - k));
     expect(hold && hold.type === "totalPeepMeasured" && hold.peepI).toBeCloseTo(expected, 0);
 
@@ -88,7 +89,8 @@ describe("Rolling values", () => {
     expect(m.rrTotal).toBeCloseTo(15, 0);
     expect(m.ve).toBeCloseTo(7.5, 1);
     expect(m.rrSpont).toBe(0);
-    expect(m.ieRatio).toBeCloseTo((4 - 0.5) / 0.5, 1);
+    const ti = 0.5 + FLOW_RAMP_TIME / 2;
+    expect(m.ieRatio).toBeCloseTo((4 - ti) / ti, 1);
   });
 });
 

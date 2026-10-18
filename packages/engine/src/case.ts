@@ -112,7 +112,7 @@ export function decodeCase(encoded: string): CaseState | null {
     settings: raw.settings,
     sedation: SEDATION.includes(raw.sedation as SedationLevel)
       ? (raw.sedation as SedationLevel)
-      : "deep",
+      : profile.startSedation,
     sex: raw.sex === "female" ? "female" : "male",
     heightCm: isNum(raw.heightCm) ? Math.min(220, Math.max(120, raw.heightCm)) : 170,
     patch,

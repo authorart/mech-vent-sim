@@ -96,10 +96,22 @@ How much of the patient's own respiratory drive is allowed through: deep (none),
 _Avoid_: paralysis (that's a different thing), consciousness
 
 **Chemoreflex**:
-The patient's drive rising as arterial pH falls and fading as pH rises, so drive stops near the apneic threshold.
+The patient's drive rising as arterial pH falls and fading as pH rises. The chemical part of drive stops near the apneic threshold.
 _Avoid_: CO2 response, feedback
 
+**Wakefulness Drive**:
+The drive to breathe that an awake (or lightly sedated) patient keeps even when alkalemic. It sets a floor under the Chemoreflex; losing it in sleep or deep sedation is what lets apnea happen.
+_Avoid_: baseline drive
+
 ## Patient–ventilator interaction
+
+**Asynchrony**:
+Any mismatch between the patient's neural breathing and what the ventilator delivers. Its types are Trigger, Flow, Cycle and Mode Asynchrony.
+_Avoid_: dyssynchrony, fighting the ventilator
+
+**Bias Flow**:
+The small continuous flow through the circuit between breaths when flow triggering. The patient can draw on it; pulling harder than it supplies drops airway pressure.
+_Avoid_: flow-by, base flow
 
 **Trigger**:
 The ventilator detecting the patient's effort, by a drop in flow or pressure, and starting a breath.
