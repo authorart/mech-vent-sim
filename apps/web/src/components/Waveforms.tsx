@@ -6,7 +6,7 @@ import { SWEEP_SECONDS } from "@/engine/ring";
 import { asynchronyMarks, breathStartTimes, sweep, useStore } from "@/engine/store";
 import { GUIDE_BY_KIND } from "@/guide/asynchrony";
 import { labelRows } from "@/guide/labels";
-import { passiveTemplate } from "@/guide/passive";
+import { passiveTemplate, type PassiveTemplate } from "@/guide/passive";
 import { messages as m } from "@/i18n";
 
 type Channel = "paw" | "flow" | "volume" | "pes" | "co2";
@@ -191,11 +191,38 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
       ctx.font = `12px ${family}`;
       ctx.textBaseline = "middle";
 
+      const onScreen = (t: number) => {
+        const i = Math.round(t * 100) % n;
+        const ts = sweep.t[i];
+        return ts !== undefined && Number.isFinite(ts) && Math.abs(ts - t) <= 0.02 ? i : -1;
+      };
+
+      // Flow starvation (labels on): the same breath with no patient effort, to draw dashed.
+      const engineState = useStore.getState().engine;
+      let overlay: { starts: number[]; ref: PassiveTemplate } | null = null;
+      if (labels && engineState?.settings.mode === "VCV") {
+        const starts = asynchronyMarks
+          .filter((mk) => mk.kind === "flowStarvation" && onScreen(mk.t) >= 0)
+          .map((mk) => breathStartTimes.filter((t) => t <= mk.t).at(-1))
+          .filter((t): t is number => t !== undefined);
+        if (starts.length > 0) {
+          const ref = passiveTemplate(
+            engineState.profileId,
+            engineState.settings,
+            engineState.mechanics,
+          );
+          overlay = { starts, ref };
+        }
+      }
+      const overlayMax = overlay ? Math.max(...overlay.ref.paw) : -Infinity;
+
       let pawRow: { top: number; yAt: (v: number) => number } | null = null;
       rowList.forEach((row, r) => {
         const top = r * (rowH + ROW_GAP);
         const data = sweep[row.channel];
-        const [lo, hi] = row.range(...extent(data));
+        const [dataLo, dataHi] = extent(data);
+        // The pressure scale stretches to fit the dashed passive curve.
+        const [lo, hi] = row.range(dataLo, row.channel === "paw" ? Math.max(dataHi, overlayMax) : dataHi);
         const yAt = (v: number) => top + rowH - ((v - lo) / (hi - lo)) * rowH;
         if (row.channel === "paw") pawRow = { top, yAt };
 
@@ -245,44 +272,28 @@ export function Waveforms({ frozen }: { frozen: boolean }) {
       // stacked in up to three rows so neighbours never overlap.
       if (labels) {
         const flowTop = rowH + ROW_GAP;
-        const onScreen = (t: number) => {
-          const i = Math.round(t * 100) % n;
-          const ts = sweep.t[i];
-          return ts !== undefined && Number.isFinite(ts) && Math.abs(ts - t) <= 0.02 ? i : -1;
-        };
-
-        // Flow starvation: the same breath with no patient effort, dashed on the pressure trace.
-        const engine = useStore.getState().engine;
-        const settings = engine?.settings;
         const pr = pawRow as { top: number; yAt: (v: number) => number } | null;
-        if (engine && settings?.mode === "VCV" && pr) {
-          const starts = asynchronyMarks
-            .filter((mk) => mk.kind === "flowStarvation" && onScreen(mk.t) >= 0)
-            .map((mk) => breathStartTimes.filter((t) => t <= mk.t).at(-1))
-            .filter((t): t is number => t !== undefined);
-          if (starts.length > 0) {
-            const ref = passiveTemplate(engine.profileId, settings, engine.mechanics);
-            ctx.strokeStyle = colors.ink2;
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([5, 4]);
-            for (const start of starts) {
-              ctx.beginPath();
-              let pen = false;
-              ref.t.forEach((dt, k) => {
-                const i = onScreen(start + dt);
-                if (i < 0) {
-                  pen = false;
-                  return;
-                }
-                const y = Math.max(pr.top, pr.yAt(ref.paw[k]!));
-                if (pen) ctx.lineTo(xAt(i), y);
-                else ctx.moveTo(xAt(i), y);
-                pen = true;
-              });
-              ctx.stroke();
-            }
-            ctx.setLineDash([]);
+        if (overlay && pr) {
+          ctx.strokeStyle = colors.ink2;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([5, 4]);
+          for (const start of overlay.starts) {
+            ctx.beginPath();
+            let lastX = -Infinity;
+            overlay.ref.t.forEach((dt, k) => {
+              const i = onScreen(start + dt);
+              const x = i < 0 ? -Infinity : xAt(i);
+              // Lift the pen off screen and where the sweep wraps back to the left edge.
+              if (i >= 0 && x >= lastX) {
+                const y = pr.yAt(overlay.ref.paw[k]!);
+                if (lastX > -Infinity) ctx.lineTo(x, y);
+                else ctx.moveTo(x, y);
+              }
+              lastX = i >= 0 && x >= lastX ? x : -Infinity;
+            });
+            ctx.stroke();
           }
+          ctx.setLineDash([]);
         }
 
         ctx.font = `11px ${family}`;
