@@ -17,7 +17,7 @@ function AlarmChip({ a, text }: { a: AlarmState; text: string }) {
   const high = a.priority === "high";
   return (
     <li
-      className={`flex items-center gap-2 rounded px-2.5 py-1 text-sm font-medium ${
+      className={`flex shrink-0 items-center gap-2 rounded px-2.5 py-1 text-sm font-medium whitespace-nowrap ${
         high ? "bg-alarm-high text-white" : "bg-alarm-medium text-chrome"
       }`}
     >
@@ -62,70 +62,71 @@ export function TopBar({
   const mode = engine?.apneaBackupActive ? "PCV (backup)" : engine?.settings.mode;
 
   return (
-    // Phone: a 2-column grid (identity | Instructor, then alarms, then silence + disclaimer).
-    // Desktop: one flex row, ordered with lg:order-*.
-    <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-edge bg-chrome px-3 py-2 sm:px-4 lg:flex lg:flex-wrap lg:gap-x-6">
-      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5 lg:order-1">
-        <span className="font-semibold">MedVent</span>
-        {profile && <span className="text-ink-2">{profile.name}</span>}
-        {mode && <span className="font-readout text-lg text-ink">{mode}</span>}
-        {engine && (
-          <span className="text-sm text-ink-3">
-            {m.sedation}: {m.sedationLevel[engine.sedation].toLowerCase()}
-          </span>
-        )}
+    // Fixed at the top. Row 1: who and what (title) and the menu. Row 2: alarms, one line high,
+    // so alarms coming and going never move the page.
+    <header className="sticky top-0 z-30 border-b border-edge bg-chrome px-3 py-2 sm:px-4">
+      <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <span className="font-semibold">MedVent</span>
+          {profile && <span className="text-ink-2">{profile.name}</span>}
+          {mode && <span className="font-readout text-lg text-ink">{mode}</span>}
+          {engine && (
+            <span className="text-sm text-ink-3">
+              {m.sedation}: {m.sedationLevel[engine.sedation].toLowerCase()}
+            </span>
+          )}
+        </div>
+        <span className="hidden rounded border border-edge px-2 py-1 text-xs text-ink-2 lg:inline">
+          {m.disclaimer}
+        </span>
+        <span className="hidden text-xs text-ink-3 xl:inline">{m.copyright}</span>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={onGuide}
+            aria-label={m.guide}
+            className="rounded border border-edge px-3 py-1.5 text-sm text-ink hover:bg-panel"
+          >
+            <span className="sm:hidden">{m.guideShort}</span>
+            <span className="hidden sm:inline">{m.guide}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onInstructor}
+            className="rounded bg-panel px-3 py-1.5 text-sm text-ink hover:bg-edge"
+          >
+            {m.instructor}
+          </button>
+        </div>
       </div>
 
-      <div className="flex gap-2 lg:order-4">
-        <button
-          type="button"
-          onClick={onGuide}
-          aria-label={m.guide}
-          className="rounded border border-edge px-3 py-2 text-sm text-ink hover:bg-panel lg:py-1.5"
+      <div className="mt-2 flex h-9 items-center gap-2">
+        <ul
+          aria-live="assertive"
+          aria-label={m.alarmsHeading}
+          className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-x-auto"
         >
-          <span className="sm:hidden">{m.guideShort}</span>
-          <span className="hidden sm:inline">{m.guide}</span>
-        </button>
-        <button
-          type="button"
-          onClick={onInstructor}
-          className="rounded bg-panel px-3 py-2 text-sm text-ink hover:bg-edge lg:py-1.5"
-        >
-          {m.instructor}
-        </button>
-      </div>
-
-      <ul
-        aria-live="assertive"
-        className="col-span-2 flex flex-wrap items-center gap-2 lg:order-2 lg:flex-1"
-      >
-        {alarms.length === 0 ? (
-          <li className="flex items-center gap-2 text-sm text-ink-3">
-            <span aria-hidden className="h-2 w-2 rounded-full bg-ok" />
-            {m.noAlarms}
-          </li>
-        ) : (
-          alarms.map((a) => (
-            <AlarmChip key={a.id} a={a} text={alarmText(a.id, engine?.alarmLimits)} />
-          ))
-        )}
-      </ul>
-
-      <div className="col-span-2 flex flex-wrap items-center gap-2 lg:contents">
+          {alarms.length === 0 ? (
+            <li className="flex items-center gap-2 text-sm whitespace-nowrap text-ink-3">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-ok" />
+              {m.noAlarms}
+            </li>
+          ) : (
+            alarms.map((a) => (
+              <AlarmChip key={a.id} a={a} text={alarmText(a.id, engine?.alarmLimits)} />
+            ))
+          )}
+        </ul>
         <button
           type="button"
           disabled={alarms.length === 0 && !silenced}
           onClick={() => send({ type: "silenceAlarms" })}
-          className="rounded border border-edge px-3 py-2 text-sm text-ink hover:bg-panel disabled:opacity-40 lg:order-3 lg:py-1.5"
+          className="shrink-0 rounded border border-edge px-3 py-1.5 text-sm whitespace-nowrap text-ink hover:bg-panel disabled:opacity-40"
         >
           {silenced && silencedUntil
             ? fmt(m.silenced, { time: mmss(silencedUntil - now) })
             : m.silence}
         </button>
-        <span className="rounded border border-edge px-2 py-1 text-xs text-ink-2 lg:order-5">
-          {m.disclaimer}
-        </span>
-        <span className="text-xs text-ink-3 lg:order-6">{m.copyright}</span>
       </div>
     </header>
   );

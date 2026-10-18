@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { num } from "@/engine/format";
 import {
   BACKUP_KNOBS,
+  COMMON_KNOBS,
   KNOBS,
   TRIGGER_KNOB,
   getValue,
@@ -62,49 +63,53 @@ function SettingsEditor({
   );
 
   const trig = value.trigger;
+  // Two rows in every mode: the mode's breath settings, then the settings all modes share.
+  // Phone: both rows scroll sideways together. Desktop: a row wraps only if the window is narrow.
+  const row = `flex items-stretch gap-2 ${layout === "strip" ? "flex-nowrap lg:flex-wrap" : "flex-wrap"}`;
   return (
-    <div
-      className={`flex items-stretch gap-2 ${layout === "strip" ? "flex-nowrap lg:flex-wrap" : "flex-wrap"}`}
-    >
-      {KNOBS[value.mode].map(knob)}
-      {(value.mode === "VCV" || value.mode === "V-SIMV") && (
+    <div className={`flex flex-col gap-2 ${layout === "strip" ? "w-max lg:w-auto" : ""}`}>
+      <div className={row}>
+        {KNOBS[value.mode].map(knob)}
+        {(value.mode === "VCV" || value.mode === "V-SIMV") && (
+          <Toggle
+            label="Flow"
+            value={value.flowPattern}
+            options={[
+              { value: "square", label: "Square" },
+              { value: "decelerating", label: "Decel" },
+            ]}
+            changed={
+              (base?.mode === "VCV" || base?.mode === "V-SIMV") &&
+              base.flowPattern !== value.flowPattern
+            }
+            onChange={(flowPattern) =>
+              onChange((s) => (s.mode === "VCV" || s.mode === "V-SIMV" ? { ...s, flowPattern } : s))
+            }
+          />
+        )}
+      </div>
+      <div className={row}>
+        {COMMON_KNOBS.map(knob)}
         <Toggle
-          label="Flow"
-          value={value.flowPattern}
+          label="Trigger type"
+          value={trig.type}
           options={[
-            { value: "square", label: "Square" },
-            { value: "decelerating", label: "Decel" },
+            { value: "flow", label: "Flow" },
+            { value: "pressure", label: "Pressure" },
           ]}
-          changed={
-            (base?.mode === "VCV" || base?.mode === "V-SIMV") &&
-            base.flowPattern !== value.flowPattern
-          }
-          onChange={(flowPattern) =>
-            onChange((s) => (s.mode === "VCV" || s.mode === "V-SIMV" ? { ...s, flowPattern } : s))
+          changed={base !== null && base.trigger.type !== trig.type}
+          onChange={(type) =>
+            onChange((s) => ({
+              ...s,
+              trigger: type === "flow" ? { type, threshold: 2 / 60 } : { type, threshold: 2 },
+            }))
           }
         />
-      )}
-      <Toggle
-        label="Trigger type"
-        value={trig.type}
-        options={[
-          { value: "flow", label: "Flow" },
-          { value: "pressure", label: "Pressure" },
-        ]}
-        changed={base !== null && base.trigger.type !== trig.type}
-        onChange={(type) =>
-          onChange((s) => ({
-            ...s,
-            trigger: type === "flow" ? { type, threshold: 2 / 60 } : { type, threshold: 2 },
-          }))
-        }
-      />
-      {knob(TRIGGER_KNOB[trig.type])}
+        {knob(TRIGGER_KNOB[trig.type])}
+      </div>
       {showBackup && value.mode === "PSV" && (
-        <div className="flex basis-full flex-wrap items-stretch gap-2 border-t border-edge pt-2 lg:basis-auto lg:border-t-0 lg:border-l lg:pt-0 lg:pl-2">
-          <span className="basis-full text-sm text-ink-2 lg:basis-auto lg:self-center lg:text-xs lg:text-ink-3 lg:[writing-mode:vertical-rl]">
-            {m.backupHeading}
-          </span>
+        <div className="flex flex-wrap items-stretch gap-2 border-t border-edge pt-2">
+          <span className="basis-full text-sm text-ink-2">{m.backupHeading}</span>
           {BACKUP_KNOBS.map(knob)}
         </div>
       )}
@@ -234,7 +239,7 @@ export function SettingsStrip() {
   return (
     <section
       aria-label="Ventilator settings"
-      className="sticky bottom-0 z-20 overflow-x-clip border-t border-edge bg-chrome px-3 py-2 lg:static lg:overflow-x-visible lg:px-4 lg:py-3"
+      className="sticky bottom-0 z-20 overflow-x-clip border-t border-edge bg-chrome px-3 py-2 lg:relative lg:overflow-x-visible lg:px-4 lg:py-3"
     >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch lg:gap-3">
         {/* Phone: mode + actions on one row. Desktop: these become direct children (lg:contents). */}
@@ -275,16 +280,25 @@ export function SettingsStrip() {
 
         {actions("hidden lg:ml-auto lg:flex lg:flex-col lg:justify-center lg:gap-2")}
       </div>
-      {engine.pendingSettings && (
-        <p role="status" className="mt-2 text-sm text-pending">
-          {m.pendingNextBreath}
-        </p>
-      )}
-      {engine.apneaBackupActive && (
-        <p role="status" className="mt-2 max-w-prose text-sm text-ink-2">
-          {m.backupNote} {engine.sedation === "deep" && m.backupNoteDeep}
-        </p>
-      )}
+      {/* Notes float above the strip so its height never changes. */}
+      <div className="pointer-events-none absolute bottom-full left-3 mb-2 flex max-w-[calc(100%-1.5rem)] flex-col items-start gap-1 lg:left-4">
+        {engine.pendingSettings && (
+          <p
+            role="status"
+            className="rounded border border-pending/60 bg-chrome px-3 py-1 text-sm text-pending"
+          >
+            {m.pendingNextBreath}
+          </p>
+        )}
+        {engine.apneaBackupActive && (
+          <p
+            role="status"
+            className="max-w-prose rounded border border-edge bg-chrome px-3 py-1.5 text-sm text-ink-2"
+          >
+            {m.backupNote} {engine.sedation === "deep" && m.backupNoteDeep}
+          </p>
+        )}
+      </div>
       <ModeDialog
         mode={modeTarget}
         from={current}

@@ -139,6 +139,7 @@ export const en = {
   notMeasured: "Use Insp. pause",
   notMeasuredHold: "Use Exp. hold",
 
+  alarmsHeading: "Alarms",
   confirm: "Confirm",
   cancel: "Cancel",
   pendingNextBreath: "New settings apply at the next breath",

@@ -25,33 +25,32 @@ const k = (
   scale = 1,
 ): KnobSpec => ({ key, label, unit, step, min, max, decimals, scale });
 
-const COMMON: KnobSpec[] = [
+/** Shared by every mode: the strip's second row. */
+export const COMMON_KNOBS: KnobSpec[] = [
   k("peep", "PEEP", "cmH₂O", 1, 0, 25),
   k("fio2", "FiO₂", "%", 5, 21, 100, 0, 100),
   k("highPressureLimit", "P limit", "cmH₂O", 1, 20, 80),
 ];
 
+/** Each mode's own breath settings: the strip's first row. */
 export const KNOBS: Record<Mode, KnobSpec[]> = {
   VCV: [
     k("tidalVolume", "Vt", "mL", 10, 200, 1200, 0, 1000),
     k("rate", "RR", "/min", 1, 4, 40),
     k("peakFlow", "Peak flow", "L/min", 5, 20, 120, 0, 60),
     k("pauseTime", "Pause", "s", 0.1, 0, 2, 1),
-    ...COMMON,
   ],
   PCV: [
     k("pInsp", "P insp", "cmH₂O", 1, 5, 50),
     k("rate", "RR", "/min", 1, 4, 40),
     k("inspTime", "Ti", "s", 0.1, 0.3, 3, 1),
     k("riseTime", "Rise", "s", 0.05, 0, 0.5, 2),
-    ...COMMON,
   ],
   PSV: [
     k("pSupport", "PS", "cmH₂O", 1, 0, 30),
     k("riseTime", "Rise", "s", 0.05, 0, 0.5, 2),
     k("esens", "Esens", "%", 5, 5, 70, 0, 100),
     k("apneaTime", "Apnea", "s", 5, 10, 60),
-    ...COMMON,
   ],
   "V-SIMV": [
     k("tidalVolume", "Vt", "mL", 10, 200, 1200, 0, 1000),
@@ -61,7 +60,6 @@ export const KNOBS: Record<Mode, KnobSpec[]> = {
     k("pSupport", "PS", "cmH₂O", 1, 0, 30),
     k("riseTime", "PS rise", "s", 0.05, 0, 0.5, 2),
     k("esens", "Esens", "%", 5, 5, 70, 0, 100),
-    ...COMMON,
   ],
   "P-SIMV": [
     k("pInsp", "P insp", "cmH₂O", 1, 5, 50),
@@ -70,7 +68,6 @@ export const KNOBS: Record<Mode, KnobSpec[]> = {
     k("riseTime", "Rise", "s", 0.05, 0, 0.5, 2),
     k("pSupport", "PS", "cmH₂O", 1, 0, 30),
     k("esens", "Esens", "%", 5, 5, 70, 0, 100),
-    ...COMMON,
   ],
 };
 

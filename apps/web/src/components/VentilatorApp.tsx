@@ -30,6 +30,11 @@ export function VentilatorApp() {
   return (
     <div className="flex min-h-screen flex-col lg:h-screen lg:min-h-0">
       <TopBar onInstructor={() => setInstructor((v) => !v)} onGuide={() => setGuide(true)} />
+      {/* Phones: the disclaimer scrolls with the page instead of taking room in the fixed bar. */}
+      <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-xs text-ink-3 sm:px-4 lg:hidden">
+        <span className="rounded border border-edge px-2 py-0.5 text-ink-2">{m.disclaimer}</span>
+        {m.copyright}
+      </p>
 
       {connection === "error" && (
         <p role="alert" className="bg-alarm-high px-4 py-2 text-sm text-white">
